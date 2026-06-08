@@ -138,6 +138,8 @@
   <div class="kpi"><span class="label">Unrealized</span><span class="value" id="k-unreal">—</span></div>
   <div class="kpi"><span class="label">Cash</span><span class="value neu"   id="k-cash">—</span></div>
   <div class="kpi"><span class="label">Positions</span><span class="value neu" id="k-pos">—</span></div>
+  <div class="kpi"><span class="label">W / L</span><span class="value" id="k-wl">—</span></div>
+  <div class="kpi"><span class="label">Win Rate</span><span class="value" id="k-wr">—</span></div>
   <div id="status-bar">
     <span class="dot" id="dot"></span>
     <span id="status-label">loading…</span>
@@ -214,6 +216,17 @@ function render(d) {
   ur.textContent = fmt$(d.unrealized); ur.className = 'value ' + cls(d.unrealized);
   document.getElementById('k-cash').textContent = fmtK(d.cash);
   document.getElementById('k-pos').textContent  = d.open_count + ' / 12';
+
+  const wins   = d.closed_today.filter(t => t.pnl > 0).length;
+  const losses = d.closed_today.filter(t => t.pnl < 0).length;
+  const total  = wins + losses;
+  const wr     = total > 0 ? Math.round(wins / total * 100) : null;
+  const wl = document.getElementById('k-wl');
+  wl.textContent = total > 0 ? `${wins}W / ${losses}L` : '—';
+  wl.className = 'value ' + (wins > losses ? 'pos' : wins < losses ? 'neg' : 'neu');
+  const wrEl = document.getElementById('k-wr');
+  wrEl.textContent = wr !== null ? wr + '%' : '—';
+  wrEl.className = 'value ' + (wr >= 60 ? 'pos' : wr < 40 ? 'neg' : 'neu');
 
   // Open positions
   document.getElementById('pos-count').textContent = d.positions.length;
