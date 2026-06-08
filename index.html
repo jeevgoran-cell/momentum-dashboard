@@ -307,16 +307,22 @@ function startCountdown() {
 }
 
 function render(d) {
+  // Null-guard all array fields so partial/stale Gist data can't crash the render
+  d.positions    = d.positions    || [];
+  d.closed_today = d.closed_today || [];
+  d.duck_queue   = d.duck_queue   || [];
+  d.history      = d.history      || [];
+
   // KPIs
-  document.getElementById('k-equity').textContent = fmtK(d.equity);
+  document.getElementById('k-equity').textContent = fmtK(d.equity || 0);
   const dp = document.getElementById('k-daypnl');
-  dp.textContent = fmt$(d.day_pnl_acct); dp.className = 'value ' + cls(d.day_pnl_acct);
+  dp.textContent = fmt$(d.day_pnl_acct ?? 0); dp.className = 'value ' + cls(d.day_pnl_acct ?? 0);
   const rz = document.getElementById('k-realized');
-  rz.textContent = fmt$(d.realized_today); rz.className = 'value ' + cls(d.realized_today);
+  rz.textContent = fmt$(d.realized_today ?? 0); rz.className = 'value ' + cls(d.realized_today ?? 0);
   const ur = document.getElementById('k-unreal');
-  ur.textContent = fmt$(d.unrealized); ur.className = 'value ' + cls(d.unrealized);
-  document.getElementById('k-cash').textContent = fmtK(d.cash);
-  document.getElementById('k-pos').textContent  = d.open_count + ' / 12';
+  ur.textContent = fmt$(d.unrealized ?? 0); ur.className = 'value ' + cls(d.unrealized ?? 0);
+  document.getElementById('k-cash').textContent = fmtK(d.cash ?? 0);
+  document.getElementById('k-pos').textContent  = (d.open_count ?? '—') + ' / 12';
 
   const wins   = d.closed_today.filter(t => t.pnl > 0).length;
   const losses = d.closed_today.filter(t => t.pnl < 0).length;
@@ -419,13 +425,15 @@ function render(d) {
   if (!spotList.length) {
     sb.innerHTML = '<div class="empty">No skipped signals today</div>';
   } else {
-    let h = '<table><thead><tr><th>Ticker</th><th>Conf</th><th>Move %</th><th>Source</th><th>Skip Reason</th><th>Live Now</th></tr></thead><tbody>';
+    let h = '<table><thead><tr><th>Ticker</th><th>Conf</th><th>Move %</th><th>Spot ~$</th><th>Source</th><th>Skip Reason</th><th>Live $</th></tr></thead><tbody>';
     for (const s of spotList) {
+      const spotStr = s.spot_price ? `$${s.spot_price}` : '—';
       const liveStr = s.live ? `<span class="hi">$${s.live}</span>` : '—';
       h += `<tr>
         <td>${s.ticker} <span class="tag tag-spotted">spotted</span></td>
         <td class="pos">${s.conf}</td>
         <td class="pos">+${s.pct}%</td>
+        <td>${spotStr}</td>
         <td><span class="neu">${s.source}</span></td>
         <td><span class="reason">${s.skip}</span></td>
         <td>${liveStr}</td>
@@ -441,19 +449,25 @@ function render(d) {
   if (!qwenList.length) {
     qb.innerHTML = '<div class="empty">No Qwen BUY signals today</div>';
   } else {
-    let h2 = '<table><thead><tr><th>Ticker</th><th>Conf</th><th>Move %</th><th>Price</th><th>RelVol</th><th>Vol Quality</th><th>Noise</th><th>Live Now</th><th>Reasoning</th></tr></thead><tbody>';
+    let h2 = '<table><thead><tr><th>Ticker</th><th>Conf</th><th>Move %</th><th>Alert $</th><th>Live $</th><th>Δ Since</th><th>RelVol</th><th>Vol Quality</th><th>Noise</th><th>Reasoning</th></tr></thead><tbody>';
     for (const q of qwenList) {
       const noiseC  = q.noise_risk === 'LOW' ? 'pos' : q.noise_risk === 'HIGH' ? 'neg' : 'neu';
       const liveStr = q.live ? `<span class="hi">$${q.live}</span>` : '—';
+      let deltaStr  = '—';
+      if (q.live && q.price) {
+        const dPct = ((q.live - q.price) / q.price * 100);
+        deltaStr = `<span class="${dPct >= 0 ? 'pos' : 'neg'}">${dPct >= 0 ? '+' : ''}${dPct.toFixed(1)}%</span>`;
+      }
       h2 += `<tr>
         <td>${q.ticker} <span class="tag tag-duck">qwen</span></td>
         <td class="pos">${q.conf}</td>
         <td class="pos">+${q.pct}%</td>
         <td>$${q.price}</td>
+        <td>${liveStr}</td>
+        <td>${deltaStr}</td>
         <td class="pos">${q.rel_vol}x</td>
         <td><span class="neu">${q.volume_quality}</span></td>
         <td class="${noiseC}">${q.noise_risk}</td>
-        <td>${liveStr}</td>
         <td><span class="reason" style="white-space:normal;max-width:260px;display:inline-block">${q.reasoning}</span></td>
       </tr>`;
     }
