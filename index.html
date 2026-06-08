@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>momentum_trader · live dashboard</title>
+<style>
+  :root {
+    --bg:      #0d1117;
+    --bg2:     #161b22;
+    --bg3:     #21262d;
+    --border:  #30363d;
+    --txt:     #e6edf3;
+    --txt2:    #8b949e;
+    --green:   #3fb950;
+    --red:     #f85149;
+    --yellow:  #d29922;
+    --blue:    #58a6ff;
+    --purple:  #bc8cff;
+    --mono:    'SF Mono','Fira Code','Consolas',monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--txt); font-family: var(--mono); font-size: 13px; }
+
+  header {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  header h1 { font-size: 14px; color: var(--blue); letter-spacing: 0.05em; white-space: nowrap; }
+
+  .kpi {
+    display: flex; flex-direction: column; gap: 2px;
+    padding: 6px 14px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    min-width: 110px;
+  }
+  .kpi .label { font-size: 10px; color: var(--txt2); text-transform: uppercase; letter-spacing: 0.08em; }
+  .kpi .value { font-size: 16px; font-weight: 600; }
+
+  .pos  { color: var(--green); }
+  .neg  { color: var(--red); }
+  .neu  { color: var(--txt2); }
+  .hi   { color: var(--blue); }
+
+  #status-bar {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--txt2);
+    display: flex; align-items: center; gap: 8px;
+    white-space: nowrap;
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); display: inline-block; }
+  .dot.stale  { background: var(--yellow); }
+  .dot.error  { background: var(--red); }
+
+  .progress-bar  { height: 2px; background: var(--bg3); border-radius: 2px; overflow: hidden; width: 80px; }
+  .progress-fill { height: 100%; background: var(--blue); transition: width 1s linear; }
+
+  main { padding: 16px 20px; display: flex; flex-direction: column; gap: 16px; }
+
+  section { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  section h2 {
+    padding: 10px 14px;
+    font-size: 12px; color: var(--txt2);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg3);
+    display: flex; gap: 8px; align-items: center;
+  }
+  .badge {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1px 7px;
+    font-size: 11px; color: var(--txt);
+  }
+
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    padding: 7px 12px; text-align: right;
+    font-size: 11px; color: var(--txt2);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    border-bottom: 1px solid var(--border); white-space: nowrap;
+  }
+  th:first-child { text-align: left; }
+  td {
+    padding: 7px 12px; text-align: right;
+    border-bottom: 1px solid var(--border); white-space: nowrap;
+  }
+  td:first-child { text-align: left; font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg3); }
+
+  .tag {
+    display: inline-block; padding: 1px 6px;
+    border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
+  }
+  .tag-duck   { background: #1c2a3a; color: var(--blue);   border: 1px solid #2a4060; }
+  .tag-long   { background: #1c2a1c; color: var(--green);  border: 1px solid #1e4020; }
+  .tag-short  { background: #2a1c1c; color: var(--red);    border: 1px solid #401e1e; }
+  .tag-claude { background: #261c3a; color: var(--purple);  border: 1px solid #3a2060; }
+
+  .reason { font-size: 11px; color: var(--txt2); }
+  .empty  { padding: 20px; text-align: center; color: var(--txt2); font-size: 12px; }
+
+  #error-banner {
+    display: none;
+    margin: 12px 20px 0;
+    padding: 10px 14px;
+    background: #2a1c1c;
+    border: 1px solid var(--red);
+    border-radius: 6px;
+    color: var(--red);
+    font-size: 12px;
+  }
+
+  /* mobile tweaks */
+  @media (max-width: 600px) {
+    header { gap: 10px; }
+    .kpi { min-width: 90px; padding: 5px 10px; }
+    .kpi .value { font-size: 14px; }
+    td, th { padding: 6px 8px; font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ momentum_trader</h1>
+  <div class="kpi"><span class="label">Equity</span><span class="value hi"  id="k-equity">—</span></div>
+  <div class="kpi"><span class="label">Day P&L</span><span class="value"    id="k-daypnl">—</span></div>
+  <div class="kpi"><span class="label">Realized</span><span class="value"   id="k-realized">—</span></div>
+  <div class="kpi"><span class="label">Unrealized</span><span class="value" id="k-unreal">—</span></div>
+  <div class="kpi"><span class="label">Cash</span><span class="value neu"   id="k-cash">—</span></div>
+  <div class="kpi"><span class="label">Positions</span><span class="value neu" id="k-pos">—</span></div>
+  <div id="status-bar">
+    <span class="dot" id="dot"></span>
+    <span id="status-label">loading…</span>
+    <div class="progress-bar"><div class="progress-fill" id="progress" style="width:100%"></div></div>
+  </div>
+</header>
+
+<div id="error-banner"></div>
+
+<main>
+  <section>
+    <h2>Open Positions <span class="badge" id="pos-count">0</span></h2>
+    <div id="pos-body"><div class="empty">Loading…</div></div>
+  </section>
+  <section>
+    <h2>Closed Today <span class="badge" id="closed-count">0</span></h2>
+    <div id="closed-body"><div class="empty">Loading…</div></div>
+  </section>
+  <section>
+    <h2>Duck Queue <span class="badge" id="duck-count">0</span></h2>
+    <div id="duck-body"><div class="empty">Loading…</div></div>
+  </section>
+</main>
+
+<script>
+// ── CONFIG: paste your Gist raw URL here after setup ──────────────────────────
+// Format: https://gist.githubusercontent.com/{user}/{gist_id}/raw/data.json
+const GIST_URL = "https://gist.githubusercontent.com/jeevgoran-cell/945d92c494c98d6faafa48ce3f9d0f38/raw/data.json";
+const REFRESH_SECS = 30;
+// ─────────────────────────────────────────────────────────────────────────────
+
+let countdown = REFRESH_SECS;
+let timerInterval = null;
+
+function fmt$(v) {
+  const s = v >= 0 ? '+' : '';
+  return s + '$' + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function fmtK(v) { return '$' + v.toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtPct(v) { return (v>=0?'+':'') + v.toFixed(2) + '%'; }
+function cls(v) { return v > 0 ? 'pos' : v < 0 ? 'neg' : 'neu'; }
+
+function holdStr(min) {
+  if (min === null || min === undefined) return '—';
+  if (min < 60) return min + 'm';
+  return Math.floor(min/60) + 'h ' + (min%60) + 'm';
+}
+function sourceTag(src, slot) {
+  if (src === 'golden_duck') return '<span class="tag tag-duck">duck</span>';
+  if (slot === 'long')  return '<span class="tag tag-long">long</span>';
+  if (slot === 'short') return '<span class="tag tag-short">short</span>';
+  if (src && src.includes('claude')) return '<span class="tag tag-claude">claude</span>';
+  return '';
+}
+
+function startCountdown() {
+  clearInterval(timerInterval);
+  countdown = REFRESH_SECS;
+  const bar = document.getElementById('progress');
+  timerInterval = setInterval(() => {
+    countdown = Math.max(0, countdown - 1);
+    bar.style.width = (countdown / REFRESH_SECS * 100) + '%';
+  }, 1000);
+}
+
+function render(d) {
+  // KPIs
+  document.getElementById('k-equity').textContent = fmtK(d.equity);
+  const dp = document.getElementById('k-daypnl');
+  dp.textContent = fmt$(d.day_pnl_acct); dp.className = 'value ' + cls(d.day_pnl_acct);
+  const rz = document.getElementById('k-realized');
+  rz.textContent = fmt$(d.realized_today); rz.className = 'value ' + cls(d.realized_today);
+  const ur = document.getElementById('k-unreal');
+  ur.textContent = fmt$(d.unrealized); ur.className = 'value ' + cls(d.unrealized);
+  document.getElementById('k-cash').textContent = fmtK(d.cash);
+  document.getElementById('k-pos').textContent  = d.open_count + ' / 12';
+
+  // Open positions
+  document.getElementById('pos-count').textContent = d.positions.length;
+  const pb = document.getElementById('pos-body');
+  if (!d.positions.length) {
+    pb.innerHTML = '<div class="empty">No open positions</div>';
+  } else {
+    let h = '<table><thead><tr><th>Ticker</th><th>Qty</th><th>Avg</th><th>Live</th>'
+      + '<th>Unreal $</th><th>Unreal %</th><th>HWM</th><th>HWM %</th>'
+      + '<th>Held</th><th>Conf</th><th>Slot</th></tr></thead><tbody>';
+    for (const p of d.positions) {
+      const uc = cls(p.unreal);
+      h += `<tr>
+        <td>${p.ticker} ${sourceTag(p.source, p.slot_kind)}</td>
+        <td>${p.qty}</td><td>$${p.avg}</td>
+        <td class="hi">$${p.live}</td>
+        <td class="${uc}">${fmt$(p.unreal)}</td>
+        <td class="${uc}">${fmtPct(p.unreal_pct)}</td>
+        <td>$${p.hwm}</td>
+        <td class="${p.hwm_pct>0?'pos':'neu'}">${fmtPct(p.hwm_pct)}</td>
+        <td>${holdStr(p.hold_min)}</td>
+        <td>${p.conf ?? '—'}</td>
+        <td><span class="tag ${p.slot_kind==='long'?'tag-long':p.slot_kind==='duck'?'tag-duck':'tag-short'}">${p.slot_kind||'—'}</span></td>
+      </tr>`;
+    }
+    pb.innerHTML = h + '</tbody></table>';
+  }
+
+  // Closed today
+  document.getElementById('closed-count').textContent = d.closed_today.length;
+  const cb = document.getElementById('closed-body');
+  if (!d.closed_today.length) {
+    cb.innerHTML = '<div class="empty">No closed trades today</div>';
+  } else {
+    let h = '<table><thead><tr><th>Ticker</th><th>Entry</th><th>Exit</th>'
+      + '<th>P&L $</th><th>P&L %</th><th>Hold</th><th>Reason</th></tr></thead><tbody>';
+    for (const t of d.closed_today) {
+      const pc = cls(t.pnl);
+      h += `<tr>
+        <td>${t.ticker}</td><td>$${t.entry}</td><td>$${t.exit}</td>
+        <td class="${pc}">${fmt$(t.pnl)}</td>
+        <td class="${pc}">${fmtPct(t.pnl_pct)}</td>
+        <td>${holdStr(t.hold_min)}</td>
+        <td><span class="reason">${t.reason}</span></td>
+      </tr>`;
+    }
+    cb.innerHTML = h + '</tbody></table>';
+  }
+
+  // Duck queue
+  document.getElementById('duck-count').textContent = d.duck_queue.length;
+  const dqb = document.getElementById('duck-body');
+  if (!d.duck_queue.length) {
+    dqb.innerHTML = '<div class="empty">No pending ducks</div>';
+  } else {
+    let h = '<table><thead><tr><th>Ticker</th><th>Alert %</th><th>Alert Price</th></tr></thead><tbody>';
+    for (const q of d.duck_queue) {
+      h += `<tr><td>${q.ticker} <span class="tag tag-duck">duck</span></td>
+        <td class="pos">+${q.pct}%</td><td>$${q.price}</td></tr>`;
+    }
+    dqb.innerHTML = h + '</tbody></table>';
+  }
+
+  // Status bar
+  document.getElementById('dot').className = 'dot';
+  const ts = new Date(d.ts);
+  const age = Math.round((Date.now() - ts) / 1000);
+  document.getElementById('status-label').textContent =
+    'updated ' + ts.toLocaleTimeString() + (age > 90 ? ` (${age}s ago)` : '');
+  document.getElementById('error-banner').style.display = 'none';
+}
+
+async function refresh() {
+  document.getElementById('dot').className = 'dot stale';
+  try {
+    // Cache-bust so GitHub CDN serves fresh data
+    const url = GIST_URL + '?t=' + Date.now();
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    render(data);
+    startCountdown();
+  } catch(e) {
+    document.getElementById('dot').className = 'dot error';
+    document.getElementById('status-label').textContent = 'fetch failed — retrying';
+    const banner = document.getElementById('error-banner');
+    banner.style.display = 'block';
+    banner.textContent = 'Cannot reach data source. Is dashboard_push.py running on the Mac? Error: ' + e.message;
+  }
+  setTimeout(refresh, REFRESH_SECS * 1000);
+}
+
+if (GIST_URL === "REPLACE_WITH_GIST_RAW_URL") {
+  document.getElementById('error-banner').style.display = 'block';
+  document.getElementById('error-banner').textContent =
+    'Setup needed: edit index.html and replace REPLACE_WITH_GIST_RAW_URL with your Gist raw URL.';
+  document.getElementById('dot').className = 'dot error';
+  document.getElementById('status-label').textContent = 'not configured';
+} else {
+  refresh();
+}
+</script>
+</body>
+</html>
