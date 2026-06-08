@@ -356,14 +356,26 @@ function render(d) {
     cb.innerHTML = '<div class="empty">No closed trades today</div>';
   } else {
     let h = '<table><thead><tr><th>Ticker</th><th>Entry</th><th>Exit</th>'
-      + '<th>P&L $</th><th>P&L %</th><th>Hold</th><th>Reason</th></tr></thead><tbody>';
+      + '<th>P&L $</th><th>P&L %</th><th>Hold</th><th>Now</th><th>vs Exit</th><th>Reason</th></tr></thead><tbody>';
     for (const t of d.closed_today) {
       const pc = cls(t.pnl);
-      h += `<tr>
+      // Right call = stock dropped after we sold (now < exit) → green row
+      // Wrong call = stock went higher after we sold (now > exit) → red tint
+      const rightCall = t.now !== null && t.now < t.exit;
+      const wrongCall = t.now !== null && t.now > t.exit * 1.005; // >0.5% above exit
+      const rowStyle = rightCall ? 'background:rgba(63,185,80,0.07)'
+                     : wrongCall ? 'background:rgba(248,81,73,0.07)' : '';
+      const nowStr = t.now !== null ? `$${t.now}` : '—';
+      const vsStr  = t.now_vs_exit_pct !== null
+        ? `<span class="${t.now_vs_exit_pct <= 0 ? 'pos' : 'neg'}">${fmtPct(t.now_vs_exit_pct)}</span>`
+        : '—';
+      h += `<tr style="${rowStyle}">
         <td>${t.ticker}</td><td>$${t.entry}</td><td>$${t.exit}</td>
         <td class="${pc}">${fmt$(t.pnl)}</td>
         <td class="${pc}">${fmtPct(t.pnl_pct)}</td>
         <td>${holdStr(t.hold_min)}</td>
+        <td class="${rightCall?'pos':wrongCall?'neg':'neu'}">${nowStr}</td>
+        <td>${vsStr}</td>
         <td><span class="reason">${t.reason}</span></td>
       </tr>`;
     }
