@@ -126,7 +126,10 @@
     .kpi .value { font-size: 14px; }
     td, th { padding: 6px 8px; font-size: 12px; }
   }
+  #chart-wrap { padding: 16px 20px 20px; }
+  #chart-wrap canvas { max-height: 220px; }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -150,6 +153,12 @@
 <div id="error-banner"></div>
 
 <main>
+  <!-- P&L Chart -->
+  <section>
+    <h2>Day P&L &amp; Equity</h2>
+    <div id="chart-wrap"><canvas id="pnl-chart"></canvas></div>
+  </section>
+
   <section>
     <h2>Open Positions <span class="badge" id="pos-count">0</span></h2>
     <div id="pos-body"><div class="empty">Loading…</div></div>
@@ -173,6 +182,88 @@ const REFRESH_SECS = 30;
 
 let countdown = REFRESH_SECS;
 let timerInterval = null;
+let pnlChart = null;
+
+function initChart() {
+  const ctx = document.getElementById('pnl-chart').getContext('2d');
+  pnlChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels: [], datasets: [
+      {
+        label: 'Day P&L ($)',
+        data: [],
+        borderColor: '#3fb950',
+        backgroundColor: 'rgba(63,185,80,0.08)',
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0.3,
+        fill: true,
+        yAxisID: 'y',
+      },
+      {
+        label: 'Equity ($)',
+        data: [],
+        borderColor: '#58a6ff',
+        backgroundColor: 'transparent',
+        borderWidth: 1.5,
+        pointRadius: 0,
+        tension: 0.3,
+        fill: false,
+        yAxisID: 'y2',
+      },
+    ]},
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: '#8b949e', font: { family: "'SF Mono','Consolas',monospace", size: 11 } } },
+        tooltip: {
+          backgroundColor: '#161b22',
+          borderColor: '#30363d',
+          borderWidth: 1,
+          titleColor: '#8b949e',
+          bodyColor: '#e6edf3',
+          callbacks: {
+            label: ctx => {
+              const v = ctx.parsed.y;
+              const sign = v >= 0 ? '+' : '';
+              return ` ${ctx.dataset.label}: ${sign}$${Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#8b949e', maxTicksLimit: 8, font: { size: 10 } }, grid: { color: '#21262d' } },
+        y: {
+          ticks: {
+            color: '#3fb950', font: { size: 10 },
+            callback: v => (v>=0?'+':'') + '$' + Math.abs(v).toLocaleString()
+          },
+          grid: { color: '#21262d' },
+          position: 'left',
+        },
+        y2: {
+          ticks: { color: '#58a6ff', font: { size: 10 }, callback: v => '$' + v.toLocaleString() },
+          grid: { drawOnChartArea: false },
+          position: 'right',
+        },
+      },
+    },
+  });
+}
+
+function updateChart(history) {
+  if (!pnlChart) initChart();
+  if (!history || !history.length) return;
+  pnlChart.data.labels = history.map(p => p.ts.slice(11, 16));  // HH:MM
+  pnlChart.data.datasets[0].data = history.map(p => p.day_pnl);
+  pnlChart.data.datasets[1].data = history.map(p => p.equity);
+  // Color P&L line red if current value is negative
+  const lastPnl = history[history.length - 1]?.day_pnl ?? 0;
+  pnlChart.data.datasets[0].borderColor = lastPnl >= 0 ? '#3fb950' : '#f85149';
+  pnlChart.data.datasets[0].backgroundColor = lastPnl >= 0 ? 'rgba(63,185,80,0.08)' : 'rgba(248,81,73,0.08)';
+  pnlChart.update('none');
+}
 
 function fmt$(v) {
   const s = v >= 0 ? '+' : '';
@@ -227,6 +318,9 @@ function render(d) {
   const wrEl = document.getElementById('k-wr');
   wrEl.textContent = wr !== null ? wr + '%' : '—';
   wrEl.className = 'value ' + (wr >= 60 ? 'pos' : wr < 40 ? 'neg' : 'neu');
+
+  // Chart
+  updateChart(d.history || []);
 
   // Open positions
   document.getElementById('pos-count').textContent = d.positions.length;
