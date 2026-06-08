@@ -100,9 +100,10 @@
     display: inline-block; padding: 1px 6px;
     border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
   }
-  .tag-duck   { background: #1c2a3a; color: var(--blue);   border: 1px solid #2a4060; }
-  .tag-long   { background: #1c2a1c; color: var(--green);  border: 1px solid #1e4020; }
-  .tag-short  { background: #2a1c1c; color: var(--red);    border: 1px solid #401e1e; }
+  .tag-duck    { background: #1c2a3a; color: var(--blue);   border: 1px solid #2a4060; }
+  .tag-long    { background: #1c2a1c; color: var(--green);  border: 1px solid #1e4020; }
+  .tag-short   { background: #2a1c1c; color: var(--red);    border: 1px solid #401e1e; }
+  .tag-spotted { background: #2a2400; color: var(--yellow); border: 1px solid #4a3800; }
   .tag-claude { background: #261c3a; color: var(--purple);  border: 1px solid #3a2060; }
 
   .reason { font-size: 11px; color: var(--txt2); }
@@ -171,6 +172,14 @@
   <section>
     <h2>Duck Queue <span class="badge" id="duck-count">0</span></h2>
     <div id="duck-body"><div class="empty">Loading…</div></div>
+  </section>
+  <section>
+    <h2>Spotted Today — Skipped BUYs <span class="badge" id="spotted-count">0</span></h2>
+    <div id="spotted-body"><div class="empty">Loading…</div></div>
+  </section>
+  <section>
+    <h2>Qwen Local LLM — Duck BUYs <span class="badge" id="qwen-count">0</span></h2>
+    <div id="qwen-body"><div class="empty">Loading…</div></div>
   </section>
 </main>
 
@@ -401,6 +410,54 @@ function render(d) {
         <td class="pos">+${q.pct}%</td><td>$${q.price}</td></tr>`;
     }
     dqb.innerHTML = h + '</tbody></table>';
+  }
+
+  // Spotted today — skipped BUYs
+  const spotList = d.spotted_today || [];
+  document.getElementById('spotted-count').textContent = spotList.length;
+  const sb = document.getElementById('spotted-body');
+  if (!spotList.length) {
+    sb.innerHTML = '<div class="empty">No skipped signals today</div>';
+  } else {
+    let h = '<table><thead><tr><th>Ticker</th><th>Conf</th><th>Move %</th><th>Source</th><th>Skip Reason</th><th>Live Now</th></tr></thead><tbody>';
+    for (const s of spotList) {
+      const liveStr = s.live ? `<span class="hi">$${s.live}</span>` : '—';
+      h += `<tr>
+        <td>${s.ticker} <span class="tag tag-spotted">spotted</span></td>
+        <td class="pos">${s.conf}</td>
+        <td class="pos">+${s.pct}%</td>
+        <td><span class="neu">${s.source}</span></td>
+        <td><span class="reason">${s.skip}</span></td>
+        <td>${liveStr}</td>
+      </tr>`;
+    }
+    sb.innerHTML = h + '</tbody></table>';
+  }
+
+  // Qwen local LLM duck BUYs
+  const qwenList = d.qwen_buys || [];
+  document.getElementById('qwen-count').textContent = qwenList.length;
+  const qb = document.getElementById('qwen-body');
+  if (!qwenList.length) {
+    qb.innerHTML = '<div class="empty">No Qwen BUY signals today</div>';
+  } else {
+    let h2 = '<table><thead><tr><th>Ticker</th><th>Conf</th><th>Move %</th><th>Price</th><th>RelVol</th><th>Vol Quality</th><th>Noise</th><th>Live Now</th><th>Reasoning</th></tr></thead><tbody>';
+    for (const q of qwenList) {
+      const noiseC  = q.noise_risk === 'LOW' ? 'pos' : q.noise_risk === 'HIGH' ? 'neg' : 'neu';
+      const liveStr = q.live ? `<span class="hi">$${q.live}</span>` : '—';
+      h2 += `<tr>
+        <td>${q.ticker} <span class="tag tag-duck">qwen</span></td>
+        <td class="pos">${q.conf}</td>
+        <td class="pos">+${q.pct}%</td>
+        <td>$${q.price}</td>
+        <td class="pos">${q.rel_vol}x</td>
+        <td><span class="neu">${q.volume_quality}</span></td>
+        <td class="${noiseC}">${q.noise_risk}</td>
+        <td>${liveStr}</td>
+        <td><span class="reason" style="white-space:normal;max-width:260px;display:inline-block">${q.reasoning}</span></td>
+      </tr>`;
+    }
+    qb.innerHTML = h2 + '</tbody></table>';
   }
 
   // Status bar
