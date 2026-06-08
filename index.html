@@ -425,18 +425,24 @@ function render(d) {
   if (!spotList.length) {
     sb.innerHTML = '<div class="empty">No skipped signals today</div>';
   } else {
-    let h = '<table><thead><tr><th>Ticker</th><th>Conf</th><th>Move %</th><th>Spot ~$</th><th>Source</th><th>Skip Reason</th><th>Live $</th></tr></thead><tbody>';
+    let h = '<table><thead><tr><th>Ticker</th><th>Conf</th><th>Move %</th><th>Spot ~$</th><th>Live $</th><th>Δ Since</th><th>Source</th><th>Skip Reason</th></tr></thead><tbody>';
     for (const s of spotList) {
       const spotStr = s.spot_price ? `$${s.spot_price}` : '—';
       const liveStr = s.live ? `<span class="hi">$${s.live}</span>` : '—';
+      let deltaStr  = '—';
+      if (s.live && s.spot_price) {
+        const dPct = ((s.live - s.spot_price) / s.spot_price * 100);
+        deltaStr = `<span class="${dPct >= 0 ? 'pos' : 'neg'}">${dPct >= 0 ? '+' : ''}${dPct.toFixed(1)}%</span>`;
+      }
       h += `<tr>
         <td>${s.ticker} <span class="tag tag-spotted">spotted</span></td>
         <td class="pos">${s.conf}</td>
         <td class="pos">+${s.pct}%</td>
         <td>${spotStr}</td>
+        <td>${liveStr}</td>
+        <td>${deltaStr}</td>
         <td><span class="neu">${s.source}</span></td>
         <td><span class="reason">${s.skip}</span></td>
-        <td>${liveStr}</td>
       </tr>`;
     }
     sb.innerHTML = h + '</tbody></table>';
