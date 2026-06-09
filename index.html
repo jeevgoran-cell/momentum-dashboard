@@ -227,6 +227,22 @@
   .sent-card .sc-value { font-size: 15px; font-weight: 700; }
   .sent-card .sc-sub   { font-size: 11px; color: var(--txt2); }
   .sent-reason { padding: 0 14px 12px; font-size: 11px; color: var(--txt2); font-style: italic; }
+
+  #regime-bar {
+    padding: 9px 20px;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
+    border-bottom: 1px solid var(--border);
+    display: none; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  #regime-bar.visible { display: flex; }
+  #regime-bar.bearish { background: #2a1414; border-bottom-color: var(--red);    color: var(--red);    }
+  #regime-bar.neutral { background: #2a2200; border-bottom-color: var(--yellow); color: var(--yellow); }
+  #regime-bar.bullish { background: #142a14; border-bottom-color: var(--green);  color: var(--green);  }
+  #regime-bar .rb-reason { font-weight: 400; font-size: 11px; opacity: 0.85; }
+  #regime-bar .rb-meta   { font-weight: 400; font-size: 10px; opacity: 0.6; margin-left: auto; }
+  .fi-sent-bearish { border-left: 3px solid var(--red); }
+  .fi-sent-neutral { border-left: 3px solid var(--yellow); }
+  .fi-sent-bullish { border-left: 3px solid var(--green); }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -253,6 +269,12 @@
 </header>
 
 <div id="error-banner"></div>
+
+<div id="regime-bar">
+  <span id="rb-label">—</span>
+  <span class="rb-reason" id="rb-reason"></span>
+  <span class="rb-meta"   id="rb-meta"></span>
+</div>
 
 <main>
   <div id="main-left">
@@ -450,7 +472,26 @@ function startCountdown() {
   }, 1000);
 }
 
+function renderRegimeBar(d) {
+  const is  = d.intraday_sentiment;
+  const bar = document.getElementById('regime-bar');
+  if (!is) { bar.className = ''; return; }
+  const sent  = is.sentiment || 'neutral';
+  const conf  = ((is.confidence || 0) * 100).toFixed(0);
+  const emoji = sent === 'bullish' ? '🟢' : sent === 'bearish' ? '🔴' : '🟡';
+  const src   = is.source === 'intraday'
+    ? `intraday · ${is.age_min ?? '?'}m ago`
+    : `morning · ${(is.ts || '').slice(11,16)} UTC`;
+  document.getElementById('rb-label').textContent  = `${emoji} MARKET ${sent.toUpperCase()}  ${conf}%`;
+  document.getElementById('rb-reason').textContent = is.reason || is.qwen_reason || '';
+  document.getElementById('rb-meta').textContent   = src;
+  bar.className = `visible ${sent}`;
+}
+
 function render(d) {
+  // Regime bar — top overall sentiment status
+  renderRegimeBar(d);
+
   // Null-guard all array fields so partial/stale Gist data can't crash the render
   d.positions    = d.positions    || [];
   d.closed_today = d.closed_today || [];
@@ -762,6 +803,15 @@ function renderFeed(events) {
       icon = '🧠';
       top = `${gfLink(ev.ticker)} <span class="hi">conf${ev.conf}</span> <span class="neu">+${ev.pct}% @ $${ev.price}</span>`;
       sub = 'qwen local BUY';
+
+    } else if (ev.type === 'INTRADAY_SENT') {
+      const s = ev.sentiment || 'neutral';
+      itemCls = `fi-sent-${s}`;
+      icon    = s === 'bullish' ? '🟢' : s === 'bearish' ? '🔴' : '🟡';
+      const confPct = ((ev.confidence || 0) * 100).toFixed(0);
+      const spyStr  = ev.spy_pct != null ? ` · SPY ${ev.spy_pct >= 0 ? '+' : ''}${ev.spy_pct}%` : '';
+      top = `<span style="font-weight:700">MARKET ${s.toUpperCase()}</span> <span class="neu">${confPct}%${spyStr}</span>`;
+      sub = ev.reason || '';
 
     } else {
       itemCls = '';
