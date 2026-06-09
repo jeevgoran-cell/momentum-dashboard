@@ -142,6 +142,8 @@
   .fi-sold-neg{ border-left: 2px solid var(--red); }
   .fi-spotted { border-left: 2px solid var(--yellow); }
   .fi-duck    { border-left: 2px solid var(--blue); }
+  .fi-claude  { border-left: 2px solid var(--purple); }
+  .fi-qwen    { border-left: 2px solid #1bc8c8; }
 
   section { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
   section h2 {
@@ -676,7 +678,20 @@ function renderFeed(events) {
       itemCls = 'fi-duck';
       icon = '🦆';
       top = `${ev.ticker} <span class="pos">+${ev.pct}%</span> <span class="neu">@ $${ev.price}</span>`;
-      sub = 'alert only';
+      sub = 'duck alert';
+
+    } else if (ev.type === 'CLAUDE') {
+      itemCls = 'fi-claude';
+      icon = '🤖';
+      const sess = ev.session ? ev.session.replace(/\s*\(.*\)/, '') : 'sweep';
+      top = `${ev.ticker} <span class="hi">conf${ev.conf}</span> <span class="neu">+${ev.pct}% @ $${ev.price}</span>`;
+      sub = sess + (ev.reason ? ' · ' + ev.reason : '');
+
+    } else if (ev.type === 'QWEN') {
+      itemCls = 'fi-qwen';
+      icon = '🧠';
+      top = `${ev.ticker} <span class="hi">conf${ev.conf}</span> <span class="neu">+${ev.pct}% @ $${ev.price}</span>`;
+      sub = 'qwen local BUY';
 
     } else {
       itemCls = '';
