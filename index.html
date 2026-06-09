@@ -71,10 +71,46 @@
     align-items: start;
   }
   #main-left { display: flex; flex-direction: column; gap: 16px; }
-  #activity-feed {
+  #right-col {
     position: sticky;
     top: 16px;
     height: calc(100vh - 90px);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  #pattern-box {
+    background: var(--bg2);
+    border: 1px solid #4a3000;
+    border-radius: 8px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  #pattern-box.has-alerts { border-color: var(--yellow); box-shadow: 0 0 8px rgba(210,153,34,0.25); }
+  .pat-header {
+    padding: 8px 12px;
+    font-size: 11px; color: var(--yellow);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    border-bottom: 1px solid #4a3000;
+    background: #1a1400;
+    display: flex; gap: 8px; align-items: center;
+  }
+  .pat-item {
+    padding: 6px 12px;
+    border-bottom: 1px solid #2a2000;
+    display: flex; align-items: baseline; justify-content: space-between; gap: 6px;
+    font-size: 12px;
+  }
+  .pat-item:last-child { border-bottom: none; }
+  .pat-ticker { font-weight: 700; color: var(--txt); min-width: 48px; }
+  .pat-pct    { color: var(--yellow); font-weight: 600; }
+  .pat-pct.monster { color: #ff9f1c; font-size: 13px; }
+  .pat-price  { color: var(--txt2); font-size: 11px; }
+  .pat-src    { font-size: 10px; color: var(--txt2); opacity: 0.7; }
+
+  #activity-feed {
+    flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     background: var(--bg2);
@@ -165,7 +201,8 @@
   /* mobile tweaks */
   @media (max-width: 900px) {
     main { grid-template-columns: 1fr; }
-    #activity-feed { position: static; height: 400px; }
+    #right-col { position: static; height: auto; }
+    #activity-feed { height: 400px; }
   }
   @media (max-width: 600px) {
     header { gap: 10px; }
@@ -230,13 +267,19 @@
     </section>
   </div>
 
-  <!-- Activity Feed — right column -->
-  <aside id="activity-feed">
-    <div class="feed-header">
-      Activity Feed <span class="badge" id="feed-count">0</span>
+  <!-- Right column: pattern alerts (top) + activity feed (scrollable) -->
+  <div id="right-col">
+    <div id="pattern-box">
+      <div class="pat-header">🚀 Parabolic Matches <span class="badge" id="pat-count">0</span></div>
+      <div id="pat-list"><div class="empty" style="font-size:11px;padding:10px">Scanning…</div></div>
     </div>
-    <div id="feed-list"><div class="empty">Loading…</div></div>
-  </aside>
+    <aside id="activity-feed">
+      <div class="feed-header">
+        Activity Feed <span class="badge" id="feed-count">0</span>
+      </div>
+      <div id="feed-list"><div class="empty">Loading…</div></div>
+    </aside>
+  </div>
 </main>
 
 <script>
@@ -544,6 +587,9 @@ function render(d) {
     qb.innerHTML = h2 + '</tbody></table>';
   }
 
+  // Parabolic pattern alerts
+  renderPatterns(d.pattern_alerts || []);
+
   // Activity feed
   renderFeed(d.activity_feed || []);
 
@@ -554,6 +600,36 @@ function render(d) {
   document.getElementById('status-label').textContent =
     'updated ' + ts.toLocaleTimeString() + (age > 90 ? ` (${age}s ago)` : '');
   document.getElementById('error-banner').style.display = 'none';
+}
+
+function renderPatterns(alerts) {
+  const list = alerts || [];
+  document.getElementById('pat-count').textContent = list.length;
+  const box = document.getElementById('pattern-box');
+  const el  = document.getElementById('pat-list');
+  if (!list.length) {
+    box.classList.remove('has-alerts');
+    el.innerHTML = '<div class="empty" style="font-size:11px;padding:10px">No parabolic movers yet today</div>';
+    return;
+  }
+  box.classList.add('has-alerts');
+  let h = '';
+  for (const a of list) {
+    const isMonster = a.pct >= 200;
+    const pctStr = a.pct >= 1000
+      ? `+${(a.pct/1000).toFixed(1)}K%`
+      : `+${a.pct.toFixed(1)}%`;
+    const srcTag = a.source === 'ibkr'
+      ? '<span class="pat-src">[IBKR]</span>'
+      : a.source === 'massive_otc' ? '<span class="pat-src">[OTC]</span>' : '';
+    h += `<div class="pat-item">
+      <span class="pat-ticker">${a.ticker}</span>
+      <span class="pat-pct ${isMonster ? 'monster' : ''}">${pctStr}</span>
+      <span class="pat-price">$${a.price}</span>
+      ${srcTag}
+    </div>`;
+  }
+  el.innerHTML = h;
 }
 
 function renderFeed(events) {
