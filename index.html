@@ -399,9 +399,8 @@ function render(d) {
 
   const gr = document.getElementById('k-growth');
   const grSub = document.getElementById('k-growth-sub');
-  const pnlToday = d.day_pnl_acct ?? 0;
-  const lastEq   = d.last_equity  ?? 0;
-  const growthPct = lastEq > 0 ? (pnlToday / lastEq * 100) : 0;
+  const pnlToday  = d.day_pnl_acct ?? 0;
+  const growthPct = pnlToday / 15000 * 100;  // bot capital ceiling: 10 slots × $1,500
   gr.textContent  = (growthPct >= 0 ? '+' : '') + growthPct.toFixed(2) + '%';
   gr.className    = 'value ' + cls(growthPct);
   grSub.textContent = fmt$(pnlToday);
