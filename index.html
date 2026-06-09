@@ -191,6 +191,7 @@
   <div class="kpi"><span class="label">Closed W/L</span><span class="value" id="k-wl">—</span></div>
   <div class="kpi"><span class="label">Closed WR%</span><span class="value" id="k-wr">—</span></div>
   <div class="kpi"><span class="label">Open W/L</span><span class="value" id="k-open-wl">—</span></div>
+  <div class="kpi"><span class="label">Growth (realized)</span><span class="value" id="k-growth">—</span><span class="label" id="k-growth-sub" style="font-size:9px;margin-top:1px">—</span></div>
   <div id="status-bar">
     <span class="dot" id="dot"></span>
     <span id="status-label">loading…</span>
@@ -395,6 +396,16 @@ function render(d) {
   const owEl = document.getElementById('k-open-wl');
   owEl.textContent = d.positions.length > 0 ? `${openWins}W / ${openLoss}L` : '—';
   owEl.className = 'value ' + (openWins > openLoss ? 'pos' : openWins < openLoss ? 'neg' : 'neu');
+
+  const gr = document.getElementById('k-growth');
+  const grSub = document.getElementById('k-growth-sub');
+  const atR = d.all_time_realized ?? 0;
+  gr.textContent = fmt$(atR);
+  gr.className = 'value ' + cls(atR);
+  const atT = d.all_time_trades ?? 0;
+  const atW = d.all_time_wins ?? 0;
+  const atWR = atT > 0 ? Math.round(atW / atT * 100) : null;
+  grSub.textContent = atT > 0 ? `${atT} trades · ${atWR}% WR` : '—';
 
   // Chart
   updateChart(d.history || []);
