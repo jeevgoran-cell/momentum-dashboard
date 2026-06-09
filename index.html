@@ -63,7 +63,49 @@
   .progress-bar  { height: 2px; background: var(--bg3); border-radius: 2px; overflow: hidden; width: 80px; }
   .progress-fill { height: 100%; background: var(--blue); transition: width 1s linear; }
 
-  main { padding: 16px 20px; display: flex; flex-direction: column; gap: 16px; }
+  main {
+    padding: 16px 20px;
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 16px;
+    align-items: start;
+  }
+  #main-left { display: flex; flex-direction: column; gap: 16px; }
+  #activity-feed {
+    position: sticky;
+    top: 16px;
+    height: calc(100vh - 90px);
+    display: flex;
+    flex-direction: column;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .feed-header {
+    padding: 10px 14px;
+    font-size: 12px; color: var(--txt2);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg3);
+    display: flex; gap: 8px; align-items: center;
+    flex-shrink: 0;
+  }
+  #feed-list { overflow-y: auto; flex: 1; }
+  .feed-item {
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .feed-item:last-child { border-bottom: none; }
+  .feed-time { font-size: 10px; color: var(--txt2); }
+  .feed-top  { font-size: 12px; font-weight: 600; display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap; }
+  .feed-sub  { font-size: 11px; color: var(--txt2); }
+  .fi-bought  { border-left: 2px solid var(--green); }
+  .fi-sold-pos{ border-left: 2px solid var(--green); }
+  .fi-sold-neg{ border-left: 2px solid var(--red); }
+  .fi-spotted { border-left: 2px solid var(--yellow); }
+  .fi-duck    { border-left: 2px solid var(--blue); }
 
   section { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
   section h2 {
@@ -121,6 +163,10 @@
   }
 
   /* mobile tweaks */
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; }
+    #activity-feed { position: static; height: 400px; }
+  }
   @media (max-width: 600px) {
     header { gap: 10px; }
     .kpi { min-width: 90px; padding: 5px 10px; }
@@ -155,32 +201,41 @@
 <div id="error-banner"></div>
 
 <main>
-  <!-- P&L Chart -->
-  <section>
-    <h2>Day P&L &amp; Equity</h2>
-    <div id="chart-wrap"><canvas id="pnl-chart"></canvas></div>
-  </section>
+  <div id="main-left">
+    <!-- P&L Chart -->
+    <section>
+      <h2>Day P&L &amp; Equity</h2>
+      <div id="chart-wrap"><canvas id="pnl-chart"></canvas></div>
+    </section>
+    <section>
+      <h2>Open Positions <span class="badge" id="pos-count">0</span></h2>
+      <div id="pos-body"><div class="empty">Loading…</div></div>
+    </section>
+    <section>
+      <h2>Closed Today <span class="badge" id="closed-count">0</span></h2>
+      <div id="closed-body"><div class="empty">Loading…</div></div>
+    </section>
+    <section>
+      <h2>Duck Queue <span class="badge" id="duck-count">0</span></h2>
+      <div id="duck-body"><div class="empty">Loading…</div></div>
+    </section>
+    <section>
+      <h2>Spotted Today — Skipped BUYs <span class="badge" id="spotted-count">0</span></h2>
+      <div id="spotted-body"><div class="empty">Loading…</div></div>
+    </section>
+    <section>
+      <h2>Qwen Local LLM — Duck BUYs <span class="badge" id="qwen-count">0</span></h2>
+      <div id="qwen-body"><div class="empty">Loading…</div></div>
+    </section>
+  </div>
 
-  <section>
-    <h2>Open Positions <span class="badge" id="pos-count">0</span></h2>
-    <div id="pos-body"><div class="empty">Loading…</div></div>
-  </section>
-  <section>
-    <h2>Closed Today <span class="badge" id="closed-count">0</span></h2>
-    <div id="closed-body"><div class="empty">Loading…</div></div>
-  </section>
-  <section>
-    <h2>Duck Queue <span class="badge" id="duck-count">0</span></h2>
-    <div id="duck-body"><div class="empty">Loading…</div></div>
-  </section>
-  <section>
-    <h2>Spotted Today — Skipped BUYs <span class="badge" id="spotted-count">0</span></h2>
-    <div id="spotted-body"><div class="empty">Loading…</div></div>
-  </section>
-  <section>
-    <h2>Qwen Local LLM — Duck BUYs <span class="badge" id="qwen-count">0</span></h2>
-    <div id="qwen-body"><div class="empty">Loading…</div></div>
-  </section>
+  <!-- Activity Feed — right column -->
+  <aside id="activity-feed">
+    <div class="feed-header">
+      Activity Feed <span class="badge" id="feed-count">0</span>
+    </div>
+    <div id="feed-list"><div class="empty">Loading…</div></div>
+  </aside>
 </main>
 
 <script>
@@ -480,6 +535,9 @@ function render(d) {
     qb.innerHTML = h2 + '</tbody></table>';
   }
 
+  // Activity feed
+  renderFeed(d.activity_feed || []);
+
   // Status bar
   document.getElementById('dot').className = 'dot';
   const ts = new Date(d.ts);
@@ -487,6 +545,70 @@ function render(d) {
   document.getElementById('status-label').textContent =
     'updated ' + ts.toLocaleTimeString() + (age > 90 ? ` (${age}s ago)` : '');
   document.getElementById('error-banner').style.display = 'none';
+}
+
+function renderFeed(events) {
+  const list = events || [];
+  document.getElementById('feed-count').textContent = list.length;
+  const el = document.getElementById('feed-list');
+  if (!list.length) {
+    el.innerHTML = '<div class="empty">No activity yet today</div>';
+    return;
+  }
+  const now = Date.now();
+  let h = '';
+  for (const ev of list) {
+    const ts = new Date(ev.ts);
+    const ageSec = Math.round((now - ts) / 1000);
+    const timeStr = ageSec < 60 ? `${ageSec}s ago`
+      : ageSec < 3600 ? `${Math.floor(ageSec / 60)}m ago`
+      : ts.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+
+    let itemCls, icon, top, sub = '';
+
+    if (ev.type === 'BOUGHT') {
+      itemCls = 'fi-bought';
+      icon = '🟢';
+      const slotTag = ev.slot ? `<span class="tag tag-${ev.slot}">${ev.slot}</span>` : '';
+      top = `${ev.ticker} ${slotTag} <span class="pos">@ $${ev.price}</span>`;
+      sub = ev.source || '';
+
+    } else if (ev.type === 'SOLD') {
+      const pnl = ev.pnl ?? 0;
+      itemCls = pnl >= 0 ? 'fi-sold-pos' : 'fi-sold-neg';
+      icon = pnl >= 0 ? '💰' : '🔴';
+      const pnlStr = pnl >= 0
+        ? `<span class="pos">+$${Math.abs(pnl).toFixed(2)}</span>`
+        : `<span class="neg">-$${Math.abs(pnl).toFixed(2)}</span>`;
+      top = `${ev.ticker} ${pnlStr} <span class="neu">@ $${ev.price}</span>`;
+      sub = ev.reason || '';
+
+    } else if (ev.type === 'SPOTTED') {
+      itemCls = 'fi-spotted';
+      icon = '👁';
+      top = `${ev.ticker} <span class="pos">+${ev.pct}%</span> <span class="neu">conf${ev.conf}</span>`;
+      const skipTxt = ev.skip ? ev.skip.replace('_', ' ') : '';
+      sub = [skipTxt, ev.source].filter(Boolean).join(' · ');
+
+    } else if (ev.type === 'DUCK') {
+      itemCls = 'fi-duck';
+      icon = '🦆';
+      top = `${ev.ticker} <span class="pos">+${ev.pct}%</span> <span class="neu">@ $${ev.price}</span>`;
+      sub = 'alert only';
+
+    } else {
+      itemCls = '';
+      icon = '·';
+      top = ev.ticker || '';
+    }
+
+    h += `<div class="feed-item ${itemCls}">
+      <div class="feed-time">${timeStr}</div>
+      <div class="feed-top">${icon} ${top}</div>
+      ${sub ? `<div class="feed-sub">${sub}</div>` : ''}
+    </div>`;
+  }
+  el.innerHTML = h;
 }
 
 async function refresh() {
