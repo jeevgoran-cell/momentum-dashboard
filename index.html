@@ -619,14 +619,11 @@ function renderPatterns(alerts) {
     const pctStr = a.pct >= 1000
       ? `+${(a.pct/1000).toFixed(1)}K%`
       : `+${a.pct.toFixed(1)}%`;
-    const srcTag = a.source === 'ibkr'
-      ? '<span class="pat-src">[IBKR]</span>'
-      : a.source === 'massive_otc' ? '<span class="pat-src">[OTC]</span>' : '';
+    const displayTicker = a.otc ? `${a.ticker}-OTC` : a.ticker;
     h += `<div class="pat-item">
-      <span class="pat-ticker">${a.ticker}</span>
+      <span class="pat-ticker">${displayTicker}</span>
       <span class="pat-pct ${isMonster ? 'monster' : ''}">${pctStr}</span>
       <span class="pat-price">$${a.price}</span>
-      ${srcTag}
     </div>`;
   }
   el.innerHTML = h;
