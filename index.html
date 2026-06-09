@@ -214,6 +214,19 @@
   }
   #chart-wrap { padding: 16px 20px 20px; }
   #chart-wrap canvas { max-height: 220px; }
+
+  .sent-grid {
+    display: flex; gap: 12px; padding: 12px 14px; flex-wrap: wrap;
+  }
+  .sent-card {
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 14px; min-width: 140px;
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .sent-card .sc-label { font-size: 10px; color: var(--txt2); text-transform: uppercase; letter-spacing: 0.08em; }
+  .sent-card .sc-value { font-size: 15px; font-weight: 700; }
+  .sent-card .sc-sub   { font-size: 11px; color: var(--txt2); }
+  .sent-reason { padding: 0 14px 12px; font-size: 11px; color: var(--txt2); font-style: italic; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -223,6 +236,7 @@
   <h1>⚡ momentum_trader</h1>
   <div class="kpi"><span class="label">Equity</span><span class="value hi"  id="k-equity">—</span></div>
   <div class="kpi"><span class="label">Day P&L</span><span class="value"    id="k-daypnl">—</span></div>
+  <div class="kpi"><span class="label">Week P&L</span><span class="value"   id="k-weekpnl">—</span></div>
   <div class="kpi"><span class="label">Realized</span><span class="value"   id="k-realized">—</span></div>
   <div class="kpi"><span class="label">Unrealized</span><span class="value" id="k-unreal">—</span></div>
   <div class="kpi"><span class="label">Cash</span><span class="value neu"   id="k-cash">—</span></div>
@@ -242,6 +256,29 @@
 
 <main>
   <div id="main-left">
+    <!-- Market Sentiment -->
+    <section id="sent-section" style="display:none">
+      <h2>Market Sentiment <span id="sent-ts" style="font-size:10px;color:var(--txt2);font-weight:400;margin-left:6px"></span></h2>
+      <div class="sent-grid">
+        <div class="sent-card">
+          <span class="sc-label">Qwen Verdict</span>
+          <span class="sc-value" id="sc-qwen">—</span>
+          <span class="sc-sub"   id="sc-qwen-conf"></span>
+        </div>
+        <div class="sent-card">
+          <span class="sc-label">VIX / Fear</span>
+          <span class="sc-value" id="sc-vix">—</span>
+          <span class="sc-sub"   id="sc-vix-label"></span>
+        </div>
+        <div class="sent-card">
+          <span class="sc-label">Institutional</span>
+          <span class="sc-value" id="sc-inst">—</span>
+          <span class="sc-sub"   id="sc-inst-conf"></span>
+        </div>
+      </div>
+      <div class="sent-reason" id="sc-reason"></div>
+    </section>
+
     <!-- P&L Chart -->
     <section>
       <h2>Day P&L &amp; Equity</h2>
@@ -383,6 +420,12 @@ function fmt$(v) {
 function fmtK(v) { return '$' + v.toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2}); }
 function fmtPct(v) { return (v>=0?'+':'') + v.toFixed(2) + '%'; }
 function cls(v) { return v > 0 ? 'pos' : v < 0 ? 'neg' : 'neu'; }
+function sentColor(s) { return s === 'bullish' ? 'pos' : s === 'bearish' ? 'neg' : 'neu'; }
+function sentEmoji(s) { return s === 'bullish' ? '🟢' : s === 'bearish' ? '🔴' : '🟡'; }
+function gfLink(ticker, otc) {
+  const exchange = otc ? 'OTCMKTS' : 'NYSE';
+  return `<a href="https://www.google.com/finance/quote/${ticker}:${exchange}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;border-bottom:1px dashed var(--border)">${ticker}</a>`;
+}
 
 function holdStr(min) {
   if (min === null || min === undefined) return '—';
@@ -414,10 +457,37 @@ function render(d) {
   d.duck_queue   = d.duck_queue   || [];
   d.history      = d.history      || [];
 
+  // Market Sentiment
+  const ms = d.market_sentiment;
+  const sentSec = document.getElementById('sent-section');
+  if (ms) {
+    sentSec.style.display = '';
+    const today = new Date().toISOString().slice(0,10);
+    document.getElementById('sent-ts').textContent =
+      ms.date !== today ? `(${ms.date})` : `as of ${(ms.ts||'').slice(11,16)} UTC`;
+    const qEl = document.getElementById('sc-qwen');
+    qEl.textContent = sentEmoji(ms.qwen_sentiment) + ' ' + (ms.qwen_sentiment||'').toUpperCase();
+    qEl.className   = 'sc-value ' + sentColor(ms.qwen_sentiment);
+    document.getElementById('sc-qwen-conf').textContent = `conf ${((ms.qwen_confidence||0)*100).toFixed(0)}%`;
+    const vEl = document.getElementById('sc-vix');
+    vEl.textContent = sentEmoji(ms.vix_sentiment) + ' ' + (ms.vix_level ? `$${ms.vix_level}` : (ms.vix_sentiment||'').toUpperCase());
+    vEl.className   = 'sc-value ' + sentColor(ms.vix_sentiment);
+    document.getElementById('sc-vix-label').textContent = ms.vix_label || '';
+    const iEl = document.getElementById('sc-inst');
+    iEl.textContent = sentEmoji(ms.inst_sentiment) + ' ' + (ms.inst_sentiment||'').toUpperCase();
+    iEl.className   = 'sc-value ' + sentColor(ms.inst_sentiment);
+    document.getElementById('sc-inst-conf').textContent = `conf ${((ms.inst_confidence||0)*100).toFixed(0)}%`;
+    document.getElementById('sc-reason').textContent = ms.qwen_reason ? `"${ms.qwen_reason}"` : '';
+  }
+
   // KPIs
   document.getElementById('k-equity').textContent = fmtK(d.equity || 0);
   const dp = document.getElementById('k-daypnl');
   dp.textContent = fmt$(d.day_pnl_acct ?? 0); dp.className = 'value ' + cls(d.day_pnl_acct ?? 0);
+  const wp = document.getElementById('k-weekpnl');
+  if (d.week_pnl !== null && d.week_pnl !== undefined) {
+    wp.textContent = fmt$(d.week_pnl); wp.className = 'value ' + cls(d.week_pnl);
+  }
   const rz = document.getElementById('k-realized');
   rz.textContent = fmt$(d.realized_today ?? 0); rz.className = 'value ' + cls(d.realized_today ?? 0);
   const ur = document.getElementById('k-unreal');
@@ -465,7 +535,7 @@ function render(d) {
     for (const p of d.positions) {
       const uc = cls(p.unreal);
       h += `<tr>
-        <td>${p.ticker} ${sourceTag(p.source, p.slot_kind)}</td>
+        <td>${gfLink(p.ticker)} ${sourceTag(p.source, p.slot_kind)}</td>
         <td>${p.qty}</td><td>$${p.avg}</td>
         <td class="hi">$${p.live}</td>
         <td class="${uc}">${fmt$(p.unreal)}</td>
@@ -501,7 +571,7 @@ function render(d) {
         ? `<span class="${t.now_vs_exit_pct <= 0 ? 'pos' : 'neg'}">${fmtPct(t.now_vs_exit_pct)}</span>`
         : '—';
       h += `<tr style="${rowStyle}">
-        <td>${t.ticker}</td><td>$${t.entry}</td><td>$${t.exit}</td>
+        <td>${gfLink(t.ticker)}</td><td>$${t.entry}</td><td>$${t.exit}</td>
         <td class="${pc}">${fmt$(t.pnl)}</td>
         <td class="${pc}">${fmtPct(t.pnl_pct)}</td>
         <td>${holdStr(t.hold_min)}</td>
@@ -521,7 +591,7 @@ function render(d) {
   } else {
     let h = '<table><thead><tr><th>Ticker</th><th>Alert %</th><th>Alert Price</th></tr></thead><tbody>';
     for (const q of d.duck_queue) {
-      h += `<tr><td>${q.ticker} <span class="tag tag-duck">duck</span></td>
+      h += `<tr><td>${gfLink(q.ticker)} <span class="tag tag-duck">duck</span></td>
         <td class="pos">+${q.pct}%</td><td>$${q.price}</td></tr>`;
     }
     dqb.innerHTML = h + '</tbody></table>';
@@ -544,7 +614,7 @@ function render(d) {
         deltaStr = `<span class="${dPct >= 0 ? 'pos' : 'neg'}">${dPct >= 0 ? '+' : ''}${dPct.toFixed(1)}%</span>`;
       }
       h += `<tr>
-        <td>${s.ticker} <span class="tag tag-spotted">spotted</span></td>
+        <td>${gfLink(s.ticker)} <span class="tag tag-spotted">spotted</span></td>
         <td class="pos">${s.conf}</td>
         <td class="pos">+${s.pct}%</td>
         <td>${spotStr}</td>
@@ -574,7 +644,7 @@ function render(d) {
         deltaStr = `<span class="${dPct >= 0 ? 'pos' : 'neg'}">${dPct >= 0 ? '+' : ''}${dPct.toFixed(1)}%</span>`;
       }
       h2 += `<tr>
-        <td>${q.ticker} <span class="tag tag-duck">qwen</span></td>
+        <td>${gfLink(q.ticker)} <span class="tag tag-duck">qwen</span></td>
         <td class="pos">${q.conf}</td>
         <td class="pos">+${q.pct}%</td>
         <td>$${q.price}</td>
@@ -623,7 +693,7 @@ function renderPatterns(alerts) {
       : `+${a.pct.toFixed(1)}%`;
     const displayTicker = a.otc ? `${a.ticker}-OTC` : a.ticker;
     h += `<div class="pat-item">
-      <span class="pat-ticker">${displayTicker}</span>
+      <span class="pat-ticker">${gfLink(a.ticker, a.otc)} ${a.otc ? '<span style="font-size:9px;color:var(--txt2)">OTC</span>' : ''}</span>
       <span class="pat-pct ${isMonster ? 'monster' : ''}">${pctStr}</span>
       <span class="pat-price">$${a.price}</span>
     </div>`;
@@ -654,7 +724,7 @@ function renderFeed(events) {
       itemCls = 'fi-bought';
       icon = '🟢';
       const slotTag = ev.slot ? `<span class="tag tag-${ev.slot}">${ev.slot}</span>` : '';
-      top = `${ev.ticker} ${slotTag} <span class="pos">@ $${ev.price}</span>`;
+      top = `${gfLink(ev.ticker)} ${slotTag} <span class="pos">@ $${ev.price}</span>`;
       sub = ev.source || '';
 
     } else if (ev.type === 'SOLD') {
@@ -664,33 +734,33 @@ function renderFeed(events) {
       const pnlStr = pnl >= 0
         ? `<span class="pos">+$${Math.abs(pnl).toFixed(2)}</span>`
         : `<span class="neg">-$${Math.abs(pnl).toFixed(2)}</span>`;
-      top = `${ev.ticker} ${pnlStr} <span class="neu">@ $${ev.price}</span>`;
+      top = `${gfLink(ev.ticker)} ${pnlStr} <span class="neu">@ $${ev.price}</span>`;
       sub = ev.reason || '';
 
     } else if (ev.type === 'SPOTTED') {
       itemCls = 'fi-spotted';
       icon = '👁';
-      top = `${ev.ticker} <span class="pos">+${ev.pct}%</span> <span class="neu">conf${ev.conf}</span>`;
+      top = `${gfLink(ev.ticker)} <span class="pos">+${ev.pct}%</span> <span class="neu">conf${ev.conf}</span>`;
       const skipTxt = ev.skip ? ev.skip.replace('_', ' ') : '';
       sub = [skipTxt, ev.source].filter(Boolean).join(' · ');
 
     } else if (ev.type === 'DUCK') {
       itemCls = 'fi-duck';
       icon = '🦆';
-      top = `${ev.ticker} <span class="pos">+${ev.pct}%</span> <span class="neu">@ $${ev.price}</span>`;
+      top = `${gfLink(ev.ticker)} <span class="pos">+${ev.pct}%</span> <span class="neu">@ $${ev.price}</span>`;
       sub = 'duck alert';
 
     } else if (ev.type === 'CLAUDE') {
       itemCls = 'fi-claude';
       icon = '🤖';
       const sess = ev.session ? ev.session.replace(/\s*\(.*\)/, '') : 'sweep';
-      top = `${ev.ticker} <span class="hi">conf${ev.conf}</span> <span class="neu">+${ev.pct}% @ $${ev.price}</span>`;
+      top = `${gfLink(ev.ticker)} <span class="hi">conf${ev.conf}</span> <span class="neu">+${ev.pct}% @ $${ev.price}</span>`;
       sub = sess + (ev.reason ? ' · ' + ev.reason : '');
 
     } else if (ev.type === 'QWEN') {
       itemCls = 'fi-qwen';
       icon = '🧠';
-      top = `${ev.ticker} <span class="hi">conf${ev.conf}</span> <span class="neu">+${ev.pct}% @ $${ev.price}</span>`;
+      top = `${gfLink(ev.ticker)} <span class="hi">conf${ev.conf}</span> <span class="neu">+${ev.pct}% @ $${ev.price}</span>`;
       sub = 'qwen local BUY';
 
     } else {
