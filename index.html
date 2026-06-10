@@ -312,6 +312,12 @@
       <div class="sent-reason" id="sc-reason"></div>
     </section>
 
+    <!-- Leverage Trades -->
+    <section id="lev-section" style="display:none">
+      <h2>⚡ Leverage Trades <span id="lev-daypnl" style="font-size:12px;font-weight:400;margin-left:8px"></span></h2>
+      <div id="lev-body"></div>
+    </section>
+
     <!-- P&L Chart -->
     <section>
       <h2>Day P&L &amp; Equity</h2>
@@ -745,6 +751,59 @@ function render(d) {
       </tr>`;
     }
     sb.innerHTML = h + '</tbody></table>';
+  }
+
+  // Leverage trades
+  const lev = d.leverage || {};
+  const levSec = document.getElementById('lev-section');
+  const levOpen   = lev.open   || [];
+  const levClosed = lev.closed || [];
+  if (levOpen.length || levClosed.length) {
+    levSec.style.display = '';
+    const dp = lev.day_pnl || 0;
+    document.getElementById('lev-daypnl').innerHTML =
+      `<span class="${dp >= 0 ? 'pos' : 'neg'}">${dp >= 0 ? '+' : ''}$${dp.toFixed(2)} today</span>`;
+    let lh = '';
+    if (levOpen.length) {
+      lh += '<div style="font-size:11px;color:var(--txt2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em">Open</div>';
+      lh += '<table><thead><tr><th>ETF</th><th>Sector</th><th>Dir</th><th>Qty</th><th>Entry</th><th>Live</th><th>Unreal</th></tr></thead><tbody>';
+      for (const p of levOpen) {
+        const uc = p.unreal !== null ? cls(p.unreal) : 'neu';
+        const unrStr = p.unreal !== null ? `<span class="${uc}">${p.unreal >= 0 ? '+' : ''}$${p.unreal.toFixed(2)}</span>` : '—';
+        const dirEmoji = p.direction === 'bull' ? '🟢' : '🔴';
+        lh += `<tr>
+          <td><b>${p.etf}</b></td>
+          <td style="color:var(--txt2);font-size:11px">${p.sector}</td>
+          <td>${dirEmoji} ${p.direction}</td>
+          <td>${p.qty}</td>
+          <td>$${p.entry}</td>
+          <td class="hi">${p.live ? '$'+p.live : '—'}</td>
+          <td>${unrStr}</td>
+        </tr>`;
+      }
+      lh += '</tbody></table>';
+    }
+    if (levClosed.length) {
+      lh += '<div style="font-size:11px;color:var(--txt2);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.06em">Closed Today</div>';
+      lh += '<table><thead><tr><th>ETF</th><th>Sector</th><th>Dir</th><th>Entry</th><th>Exit</th><th>P&L $</th><th>P&L %</th><th>Reason</th></tr></thead><tbody>';
+      for (const t of levClosed) {
+        const pc = cls(t.pnl);
+        const dirEmoji = t.direction === 'bull' ? '🟢' : '🔴';
+        lh += `<tr>
+          <td><b>${t.etf}</b></td>
+          <td style="color:var(--txt2);font-size:11px">${t.sector}</td>
+          <td>${dirEmoji} ${t.direction}</td>
+          <td>$${t.entry}</td><td>$${t.exit}</td>
+          <td class="${pc}">${t.pnl >= 0 ? '+' : ''}$${t.pnl.toFixed(2)}</td>
+          <td class="${pc}">${t.pnl_pct >= 0 ? '+' : ''}${t.pnl_pct.toFixed(1)}%</td>
+          <td><span class="reason">${t.reason}</span></td>
+        </tr>`;
+      }
+      lh += '</tbody></table>';
+    }
+    document.getElementById('lev-body').innerHTML = lh;
+  } else {
+    levSec.style.display = 'none';
   }
 
   // Qwen local LLM duck BUYs
