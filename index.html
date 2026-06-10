@@ -459,7 +459,7 @@ function toggleGroup(gid) {
   if (!row) return;
   const open = row.style.display !== 'none';
   row.style.display = open ? 'none' : 'table-row';
-  if (arrow) arrow.textContent = open ? '▶' : '▼';
+  if (arrow) arrow.textContent = open ? '›' : '⌄';
 }
 function sentColor(s) { return s === 'bullish' ? 'pos' : s === 'bearish' ? 'neg' : 'neu'; }
 function sentEmoji(s) { return s === 'bullish' ? '🟢' : s === 'bearish' ? '🔴' : '🟡'; }
@@ -647,8 +647,8 @@ function render(d) {
       if (!groups[t.ticker]) groups[t.ticker] = [];
       groups[t.ticker].push(t);
     }
-    let h = '<table><thead><tr><th></th><th>Ticker</th><th>Trades</th>'
-      + '<th>P&L $</th><th>P&L %</th><th>Avg Hold</th><th>Now</th><th>vs Exit</th><th>Reason</th></tr></thead><tbody>';
+    let h = '<table><thead><tr><th>Ticker</th><th>P&L $</th><th>P&L %</th>'
+      + '<th>Avg Hold</th><th>Now</th><th>vs Exit</th><th>Reason</th></tr></thead><tbody>';
     const tickerOrder = Object.keys(groups).sort((a,b) => {
       const pa = groups[a].reduce((s,t)=>s+t.pnl,0);
       const pb = groups[b].reduce((s,t)=>s+t.pnl,0);
@@ -671,10 +671,11 @@ function render(d) {
       const reasons = [...new Set(trades.map(t=>t.reason))].join(', ');
       const gid = `cg-${ticker}`;
       const multi = trades.length > 1;
-      h += `<tr class="closed-group-row" style="cursor:${multi?'pointer':'default'}" onclick="${multi?`toggleGroup('${gid}')`:''}" data-gid="${gid}">
-        <td style="width:14px;text-align:center">${multi ? `<span id="${gid}-arrow">▶</span>` : ''}</td>
-        <td>${gfLink(ticker)}${multi?` <span class="badge">${trades.length}</span>`:''}</td>
-        <td style="color:var(--txt2);font-size:11px">${multi ? trades.length+' trades' : '1 trade'}</td>
+      const tickerCell = multi
+        ? `<span style="cursor:pointer" onclick="toggleGroup('${gid}')">${gfLink(ticker)} <span id="${gid}-arrow" style="color:var(--txt2);font-size:10px">›</span> <span class="badge">${trades.length}</span></span>`
+        : gfLink(ticker);
+      h += `<tr>
+        <td>${tickerCell}</td>
         <td class="${pc}">${fmt$(totalPnl)}</td>
         <td class="${pc}">${fmtPct(avgPnlPct)}</td>
         <td>${holdStr(Math.round(avgHold))}</td>
@@ -683,19 +684,17 @@ function render(d) {
         <td><span class="reason">${reasons}</span></td>
       </tr>`;
       if (multi) {
-        h += `<tr id="${gid}" style="display:none"><td colspan="9" style="padding:0">
+        h += `<tr id="${gid}" style="display:none"><td colspan="7" style="padding:0">
           <table style="width:100%;background:var(--bg3);font-size:11px">
-          <thead><tr style="color:var(--txt2)"><th></th><th>Entry</th><th>Exit</th><th>P&L $</th><th>P&L %</th><th>Hold</th><th></th><th></th><th>Reason</th></tr></thead><tbody>`;
+          <thead><tr style="color:var(--txt2)"><th style="padding-left:20px">Entry</th><th>Exit</th><th>P&L $</th><th>P&L %</th><th>Hold</th><th colspan="2">Reason</th></tr></thead><tbody>`;
         for (const t of trades) {
           const tpc = cls(t.pnl);
           h += `<tr>
-            <td style="padding-left:16px;color:var(--txt2)">#</td>
-            <td>$${t.entry}</td><td>$${t.exit}</td>
+            <td style="padding-left:20px">$${t.entry}</td><td>$${t.exit}</td>
             <td class="${tpc}">${fmt$(t.pnl)}</td>
             <td class="${tpc}">${fmtPct(t.pnl_pct)}</td>
             <td>${holdStr(t.hold_min)}</td>
-            <td></td><td></td>
-            <td><span class="reason">${t.reason}</span></td>
+            <td colspan="2"><span class="reason">${t.reason}</span></td>
           </tr>`;
         }
         h += `</tbody></table></td></tr>`;
