@@ -261,6 +261,10 @@
   <div class="kpi"><span class="label">Closed WR%</span><span class="value" id="k-wr">—</span></div>
   <div class="kpi"><span class="label">Open W/L</span><span class="value" id="k-open-wl">—</span></div>
   <div class="kpi"><span class="label">Today Growth</span><span class="value" id="k-growth">—</span><span class="label" id="k-growth-sub" style="font-size:9px;margin-top:1px">—</span></div>
+  <div class="kpi" id="mvp-chip" style="display:none;border:1px solid var(--yellow);border-radius:4px;padding:2px 8px">
+    <span class="label">🏆 MVP</span>
+    <span class="value hi" id="k-mvp">—</span>
+  </div>
   <div id="status-bar">
     <span class="dot" id="dot"></span>
     <span id="status-label">loading…</span>
@@ -560,6 +564,17 @@ function render(d) {
   gr.textContent  = (growthPct >= 0 ? '+' : '') + growthPct.toFixed(2) + '%';
   gr.className    = 'value ' + cls(growthPct);
   grSub.textContent = fmt$(pnlToday);
+
+  // MVP chip
+  const mvpChip = document.getElementById('mvp-chip');
+  const mvpVal  = document.getElementById('k-mvp');
+  const mp = d.mvp_pick;
+  if (mp && mp.ticker) {
+    mvpChip.style.display = '';
+    mvpVal.textContent = mp.ticker + (mp.live ? ` $${mp.live.toFixed(2)}` : '');
+  } else {
+    mvpChip.style.display = 'none';
+  }
 
   // Chart
   updateChart(d.history || []);
