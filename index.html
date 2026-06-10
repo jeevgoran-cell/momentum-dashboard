@@ -772,8 +772,13 @@ function renderPatterns(alerts) {
     const nowColor = a.first_price
       ? (a.price > a.first_price ? 'var(--green)' : a.price < a.first_price ? 'var(--red)' : 'var(--txt2)')
       : 'var(--txt2)';
+    let peakStr = `$${a.peak_price}`;
+    if (a.first_price && a.peak_price && a.first_price > 0) {
+      const peakPct = ((a.peak_price - a.first_price) / a.first_price * 100).toFixed(0);
+      peakStr = `$${a.peak_price} (${peakPct}%)`;
+    }
     const priceChain = (a.first_price && a.peak_price)
-      ? `ID $${a.first_price} → Max $${a.peak_price} → <span style="color:${nowColor};font-weight:700">Now $${a.price}</span>`
+      ? `ID $${a.first_price} → Max ${peakStr} → <span style="color:${nowColor};font-weight:700">Now $${a.price}</span>`
       : `<span style="color:${nowColor}">$${a.price}</span>`;
     h += `<div class="pat-item">
       <span class="pat-ticker">${gfLink(a.ticker, a.otc)} ${a.otc ? '<span style="font-size:9px;color:var(--txt2)">OTC</span>' : ''}</span>
