@@ -883,8 +883,18 @@ function renderPatterns(alerts) {
     const priceChain = (a.first_price && a.peak_price)
       ? `ID $${a.first_price} → Max ${peakStr} → <span style="color:${nowColor};font-weight:700">Now $${a.price}</span>`
       : `<span style="color:${nowColor}">$${a.price}</span>`;
+    const blockBadgeColor = {
+      'off peak': 'var(--red)', 'declining': 'var(--red)',
+      'over-ext': '#e07a00', 'price drifted': '#e07a00',
+      'bear regime': '#e07a00', 'sent bearish': '#e07a00',
+      'below PMH': 'var(--txt2)', 'earnings': 'var(--txt2)',
+      'no support': '#e07a00', 'held': 'var(--green)',
+    };
+    const blockBadge = a.block_label
+      ? `<span style="font-size:9px;font-weight:700;color:${blockBadgeColor[a.block_label]||'var(--txt2)'};background:var(--bg3);border:1px solid currentColor;border-radius:3px;padding:1px 4px;margin-left:6px;opacity:.85">🚫 ${a.block_label}</span>`
+      : '';
     h += `<div class="pat-item">
-      <span class="pat-ticker">${gfLink(a.ticker, a.otc)} ${a.otc ? '<span style="font-size:9px;color:var(--txt2)">OTC</span>' : ''}</span>
+      <span class="pat-ticker">${gfLink(a.ticker, a.otc)} ${a.otc ? '<span style="font-size:9px;color:var(--txt2)">OTC</span>' : ''}${blockBadge}</span>
       <span class="pat-pct ${isMonster ? 'monster' : ''}">${pctStr}</span>
       <span class="pat-price">${priceChain}</span>
     </div>`;
