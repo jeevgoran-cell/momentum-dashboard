@@ -285,6 +285,13 @@
     <!-- Market Sentiment -->
     <section id="sent-section" style="display:none">
       <h2>Market Sentiment <span id="sent-ts" style="font-size:10px;color:var(--txt2);font-weight:400;margin-left:6px"></span></h2>
+      <!-- Overall sentiment badge -->
+      <div id="overall-sent-row" style="display:none;align-items:center;gap:10px;margin-bottom:12px;padding:8px 12px;border-radius:6px;background:var(--bg3);border:1px solid var(--border)">
+        <span style="font-size:11px;color:var(--txt2);font-weight:600;letter-spacing:.05em">OVERALL</span>
+        <span id="overall-sent-badge" style="font-size:15px;font-weight:700;letter-spacing:.04em">—</span>
+        <span id="overall-sent-score" style="font-size:11px;color:var(--txt2)"></span>
+        <span style="font-size:10px;color:var(--txt2);margin-left:auto">Qwen intraday × 3 · Qwen morning × 2 · VIX × 1.5 · Inst × 1</span>
+      </div>
       <div class="sent-grid">
         <div class="sent-card">
           <span class="sc-label">Qwen Verdict</span>
@@ -523,6 +530,20 @@ function render(d) {
     iEl.className   = 'sc-value ' + sentColor(ms.inst_sentiment);
     document.getElementById('sc-inst-conf').textContent = `conf ${((ms.inst_confidence||0)*100).toFixed(0)}%`;
     document.getElementById('sc-reason').textContent = ms.qwen_reason ? `"${ms.qwen_reason}"` : '';
+
+    // Overall sentiment badge
+    const overallRow = document.getElementById('overall-sent-row');
+    if (ms.overall_sentiment) {
+      overallRow.style.display = 'flex';
+      const ov = ms.overall_sentiment;
+      const badge = document.getElementById('overall-sent-badge');
+      badge.textContent = sentEmoji(ov) + ' ' + ov.toUpperCase();
+      badge.style.color = ov === 'bullish' ? 'var(--green)' : ov === 'bearish' ? 'var(--red)' : 'var(--txt2)';
+      const scoreEl = document.getElementById('overall-sent-score');
+      scoreEl.textContent = ms.overall_score !== undefined ? `(score ${ms.overall_score > 0 ? '+' : ''}${ms.overall_score})` : '';
+    } else {
+      document.getElementById('overall-sent-row').style.display = 'none';
+    }
   }
 
   // KPIs
