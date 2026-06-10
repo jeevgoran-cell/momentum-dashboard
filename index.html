@@ -769,10 +769,13 @@ function renderPatterns(alerts) {
       ? `+${(a.pct/1000).toFixed(1)}K%`
       : `+${a.pct.toFixed(1)}%`;
     const displayTicker = a.otc ? `${a.ticker}-OTC` : a.ticker;
+    const priceChain = (a.first_price && a.peak_price)
+      ? `ID $${a.first_price} → Max $${a.peak_price} → Now $${a.price}`
+      : `$${a.price}`;
     h += `<div class="pat-item">
       <span class="pat-ticker">${gfLink(a.ticker, a.otc)} ${a.otc ? '<span style="font-size:9px;color:var(--txt2)">OTC</span>' : ''}</span>
       <span class="pat-pct ${isMonster ? 'monster' : ''}">${pctStr}</span>
-      <span class="pat-price">$${a.price}</span>
+      <span class="pat-price">${priceChain}</span>
     </div>`;
   }
   el.innerHTML = h;
