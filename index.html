@@ -677,9 +677,10 @@ function render(d) {
       const reasons = [...new Set(trades.map(t=>t.reason))].join(', ');
       const gid = `cg-${ticker}`;
       const multi = trades.length > 1;
+      const tag = trades[0].tag ? `<span style="font-size:9px;color:var(--yellow);margin-left:3px">${trades[0].tag}</span>` : '';
       const tickerCell = multi
-        ? `<span style="cursor:pointer" onclick="toggleGroup('${gid}')">${gfLink(ticker)} <span id="${gid}-arrow" style="color:var(--txt2);font-size:10px">›</span> <span class="badge">${trades.length}</span></span>`
-        : gfLink(ticker);
+        ? `<span style="cursor:pointer" onclick="toggleGroup('${gid}')">${gfLink(ticker)}${tag} <span id="${gid}-arrow" style="color:var(--txt2);font-size:10px">›</span> <span class="badge">${trades.length}</span></span>`
+        : `${gfLink(ticker)}${tag}`;
       h += `<tr>
         <td>${tickerCell}</td>
         <td class="${pc}">${fmt$(totalPnl)}</td>
