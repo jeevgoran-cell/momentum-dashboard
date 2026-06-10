@@ -453,6 +453,14 @@ function fmt$(v) {
 function fmtK(v) { return '$' + v.toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2}); }
 function fmtPct(v) { return (v>=0?'+':'') + v.toFixed(2) + '%'; }
 function cls(v) { return v > 0 ? 'pos' : v < 0 ? 'neg' : 'neu'; }
+function toggleGroup(gid) {
+  const row = document.getElementById(gid);
+  const arrow = document.getElementById(gid + '-arrow');
+  if (!row) return;
+  const open = row.style.display !== 'none';
+  row.style.display = open ? 'none' : 'table-row';
+  if (arrow) arrow.textContent = open ? '▶' : '▼';
+}
 function sentColor(s) { return s === 'bullish' ? 'pos' : s === 'bearish' ? 'neg' : 'neu'; }
 function sentEmoji(s) { return s === 'bullish' ? '🟢' : s === 'bearish' ? '🔴' : '🟡'; }
 function gfLink(ticker, otc) {
@@ -627,35 +635,71 @@ function render(d) {
     pb.innerHTML = h + '</tbody></table>';
   }
 
-  // Closed today
+  // Closed today — grouped by ticker, collapsible
   document.getElementById('closed-count').textContent = d.closed_today.length;
   const cb = document.getElementById('closed-body');
   if (!d.closed_today.length) {
     cb.innerHTML = '<div class="empty">No closed trades today</div>';
   } else {
-    let h = '<table><thead><tr><th>Ticker</th><th>Entry</th><th>Exit</th>'
-      + '<th>P&L $</th><th>P&L %</th><th>Hold</th><th>Now</th><th>vs Exit</th><th>Reason</th></tr></thead><tbody>';
+    // Group by ticker
+    const groups = {};
     for (const t of d.closed_today) {
-      const pc = cls(t.pnl);
-      // Right call = stock dropped after we sold (now < exit) → green row
-      // Wrong call = stock went higher after we sold (now > exit) → red tint
-      const rightCall = t.now !== null && t.now < t.exit;
-      const wrongCall = t.now !== null && t.now > t.exit * 1.005; // >0.5% above exit
-      const rowStyle = rightCall ? 'background:rgba(63,185,80,0.07)'
-                     : wrongCall ? 'background:rgba(248,81,73,0.07)' : '';
-      const nowStr = t.now !== null ? `$${t.now}` : '—';
-      const vsStr  = t.now_vs_exit_pct !== null
-        ? `<span class="${t.now_vs_exit_pct <= 0 ? 'pos' : 'neg'}">${fmtPct(t.now_vs_exit_pct)}</span>`
-        : '—';
-      h += `<tr style="${rowStyle}">
-        <td>${gfLink(t.ticker)}</td><td>$${t.entry}</td><td>$${t.exit}</td>
-        <td class="${pc}">${fmt$(t.pnl)}</td>
-        <td class="${pc}">${fmtPct(t.pnl_pct)}</td>
-        <td>${holdStr(t.hold_min)}</td>
+      if (!groups[t.ticker]) groups[t.ticker] = [];
+      groups[t.ticker].push(t);
+    }
+    let h = '<table><thead><tr><th></th><th>Ticker</th><th>Trades</th>'
+      + '<th>P&L $</th><th>P&L %</th><th>Avg Hold</th><th>Now</th><th>vs Exit</th><th>Reason</th></tr></thead><tbody>';
+    const tickerOrder = Object.keys(groups).sort((a,b) => {
+      const pa = groups[a].reduce((s,t)=>s+t.pnl,0);
+      const pb = groups[b].reduce((s,t)=>s+t.pnl,0);
+      return pb - pa;
+    });
+    for (const ticker of tickerOrder) {
+      const trades = groups[ticker];
+      const totalPnl  = trades.reduce((s,t) => s+t.pnl, 0);
+      const avgPnlPct = trades.reduce((s,t) => s+(t.pnl_pct||0), 0) / trades.length;
+      const avgHold   = trades.reduce((s,t) => s+(t.hold_min||0), 0) / trades.length;
+      const lastNow   = trades[trades.length-1].now;
+      const lastExit  = trades[trades.length-1].exit;
+      const lastVsPct = trades[trades.length-1].now_vs_exit_pct;
+      const pc = cls(totalPnl);
+      const nowStr = lastNow !== null ? `$${lastNow}` : '—';
+      const rightCall = lastNow !== null && lastNow < lastExit;
+      const wrongCall = lastNow !== null && lastNow > lastExit * 1.005;
+      const vsStr = lastVsPct !== null
+        ? `<span class="${lastVsPct <= 0 ? 'pos' : 'neg'}">${fmtPct(lastVsPct)}</span>` : '—';
+      const reasons = [...new Set(trades.map(t=>t.reason))].join(', ');
+      const gid = `cg-${ticker}`;
+      const multi = trades.length > 1;
+      h += `<tr class="closed-group-row" style="cursor:${multi?'pointer':'default'}" onclick="${multi?`toggleGroup('${gid}')`:''}" data-gid="${gid}">
+        <td style="width:14px;text-align:center">${multi ? `<span id="${gid}-arrow">▶</span>` : ''}</td>
+        <td>${gfLink(ticker)}${multi?` <span class="badge">${trades.length}</span>`:''}</td>
+        <td style="color:var(--txt2);font-size:11px">${multi ? trades.length+' trades' : '1 trade'}</td>
+        <td class="${pc}">${fmt$(totalPnl)}</td>
+        <td class="${pc}">${fmtPct(avgPnlPct)}</td>
+        <td>${holdStr(Math.round(avgHold))}</td>
         <td class="${rightCall?'pos':wrongCall?'neg':'neu'}">${nowStr}</td>
         <td>${vsStr}</td>
-        <td><span class="reason">${t.reason}</span></td>
+        <td><span class="reason">${reasons}</span></td>
       </tr>`;
+      if (multi) {
+        h += `<tr id="${gid}" style="display:none"><td colspan="9" style="padding:0">
+          <table style="width:100%;background:var(--bg3);font-size:11px">
+          <thead><tr style="color:var(--txt2)"><th></th><th>Entry</th><th>Exit</th><th>P&L $</th><th>P&L %</th><th>Hold</th><th></th><th></th><th>Reason</th></tr></thead><tbody>`;
+        for (const t of trades) {
+          const tpc = cls(t.pnl);
+          h += `<tr>
+            <td style="padding-left:16px;color:var(--txt2)">#</td>
+            <td>$${t.entry}</td><td>$${t.exit}</td>
+            <td class="${tpc}">${fmt$(t.pnl)}</td>
+            <td class="${tpc}">${fmtPct(t.pnl_pct)}</td>
+            <td>${holdStr(t.hold_min)}</td>
+            <td></td><td></td>
+            <td><span class="reason">${t.reason}</span></td>
+          </tr>`;
+        }
+        h += `</tbody></table></td></tr>`;
+      }
     }
     cb.innerHTML = h + '</tbody></table>';
   }
