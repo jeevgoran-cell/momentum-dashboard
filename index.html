@@ -267,6 +267,7 @@
   </div>
   <div id="status-bar">
     <span class="dot" id="dot"></span>
+    <span id="data-age" style="font-weight:600"></span>
     <span id="status-label">loading…</span>
     <div class="progress-bar"><div class="progress-fill" id="progress" style="width:100%"></div></div>
   </div>
@@ -369,6 +370,20 @@ const REFRESH_SECS = 5;
 let countdown = REFRESH_SECS;
 let timerInterval = null;
 let pnlChart = null;
+let lastDataTs = null;  // payload ts (ms) — drives the data-age indicator
+
+function tickDataAge() {
+  const el = document.getElementById('data-age');
+  if (!el || !lastDataTs) return;
+  const age = Math.round((Date.now() - lastDataTs) / 1000);
+  const txt = age < 60 ? `${age}s` : `${Math.floor(age / 60)}m ${age % 60}s`;
+  el.textContent = `data ${txt}`;
+  // <2min fresh, 2-5min aging, >5min stale (push outage / KV lag)
+  el.style.color = age < 120 ? 'var(--green)' : age < 300 ? 'var(--yellow)' : 'var(--red)';
+  const dot = document.getElementById('dot');
+  if (age >= 300) dot.className = 'dot error';
+  else if (age >= 120) dot.className = 'dot stale';
+}
 
 function initChart() {
   const ctx = document.getElementById('pnl-chart').getContext('2d');
@@ -493,6 +508,7 @@ function startCountdown() {
   timerInterval = setInterval(() => {
     countdown = Math.max(0, countdown - 1);
     bar.style.width = (countdown / REFRESH_SECS * 100) + '%';
+    tickDataAge();
   }, 1000);
 }
 
@@ -853,9 +869,10 @@ function render(d) {
   // Status bar
   document.getElementById('dot').className = 'dot';
   const ts = new Date(d.ts);
-  const age = Math.round((Date.now() - ts) / 1000);
+  lastDataTs = ts.getTime();
+  tickDataAge();
   document.getElementById('status-label').textContent =
-    'updated ' + ts.toLocaleTimeString() + (age > 90 ? ` (${age}s ago)` : '');
+    'updated ' + ts.toLocaleTimeString();
   document.getElementById('error-banner').style.display = 'none';
 }
 
