@@ -600,13 +600,19 @@ function render(d) {
   gr.className    = 'value ' + cls(growthPct);
   grSub.textContent = fmt$(pnlToday);
 
-  // MVP chip
+  // MVP chip — live price + ▲/▼ change vs price at recognition
   const mvpChip = document.getElementById('mvp-chip');
   const mvpVal  = document.getElementById('k-mvp');
   const mp = d.mvp_pick;
   if (mp && mp.ticker) {
     mvpChip.style.display = '';
-    mvpVal.textContent = mp.ticker + (mp.live ? ` $${mp.live.toFixed(2)}` : '');
+    let txt = mp.ticker + (mp.live ? ` $${mp.live.toFixed(2)}` : '');
+    if (mp.live && mp.ref_price) {
+      const chg = (mp.live - mp.ref_price) / mp.ref_price * 100;
+      txt += ` ${chg >= 0 ? '▲' : '▼'} ${chg >= 0 ? '+' : ''}${chg.toFixed(1)}%`;
+      mvpVal.style.color = chg >= 0 ? 'var(--green)' : 'var(--red)';
+    }
+    mvpVal.textContent = txt;
   } else {
     mvpChip.style.display = 'none';
   }
