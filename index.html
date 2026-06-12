@@ -283,6 +283,13 @@
 
 <main>
   <div id="main-left">
+    <!-- MVP pick history (toggled by clicking the MVP chip) -->
+    <section id="mvp-history-sec" style="display:none">
+      <h2>🏆 MVP Picks — last 14 days
+        <span style="font-size:10px;color:var(--txt2);font-weight:400;margin-left:6px">click MVP chip to hide</span>
+      </h2>
+      <div id="mvp-history-body"></div>
+    </section>
     <!-- Market Sentiment -->
     <section id="sent-section" style="display:none">
       <h2>Market Sentiment <span id="sent-ts" style="font-size:10px;color:var(--txt2);font-weight:400;margin-left:6px"></span></h2>
@@ -501,6 +508,44 @@ function sourceTag(src, slot) {
   return '';
 }
 
+let mvpHistData = [];
+
+function renderMvpHistory(hist) {
+  mvpHistData = hist;
+  const body = document.getElementById('mvp-history-body');
+  if (!hist.length) {
+    body.innerHTML = '<div class="empty">No MVP pick history yet</div>';
+    return;
+  }
+  const cell = (v, suffix='%') => v == null ? '<span class="neu">—</span>'
+    : `<span class="${v >= 0 ? 'pos' : 'neg'}">${v >= 0 ? '+' : ''}${v.toFixed(1)}${suffix}</span>`;
+  let totalPnl = 0, traded = 0, wins3d = 0, n3d = 0;
+  let h = `<table><thead><tr>
+    <th>Date</th><th>Ticker</th><th>Day move</th><th>3d move</th>
+    <th>Traded P&amp;L</th><th>Outcome</th></tr></thead><tbody>`;
+  for (const r of hist) {
+    if (r.traded && r.pnl_usd != null) { totalPnl += r.pnl_usd; traded++; }
+    if (r.move_3d_pct != null) { n3d++; if (r.move_3d_pct > 0) wins3d++; }
+    const pnlCell = (r.traded && r.pnl_usd != null)
+      ? `<span class="${r.pnl_usd >= 0 ? 'pos' : 'neg'}">${r.pnl_usd >= 0 ? '+' : ''}$${r.pnl_usd.toFixed(0)}</span>`
+      : '<span class="neu">not traded</span>';
+    h += `<tr>
+      <td style="font-weight:400">${r.date.slice(5)}</td>
+      <td>${gfLink(r.ticker)}</td>
+      <td>${cell(r.day_move_pct)}</td>
+      <td>${cell(r.move_3d_pct)}</td>
+      <td>${pnlCell}</td>
+      <td class="reason">${r.outcome || ''}</td>
+    </tr>`;
+  }
+  h += `</tbody></table>
+    <div style="padding:8px 12px;font-size:11px;color:var(--txt2);border-top:1px solid var(--border)">
+      Traded: ${traded} pick(s), realized <span class="${totalPnl >= 0 ? 'pos' : 'neg'}">${totalPnl >= 0 ? '+' : ''}$${totalPnl.toFixed(0)}</span>
+      &nbsp;·&nbsp; 3-day win rate (all picks): ${n3d ? Math.round(wins3d / n3d * 100) + '%' : '—'} (${wins3d}/${n3d})
+    </div>`;
+  body.innerHTML = h;
+}
+
 function startCountdown() {
   clearInterval(timerInterval);
   countdown = REFRESH_SECS;
@@ -621,6 +666,8 @@ function render(d) {
   const mp = d.mvp_pick;
   if (mp && mp.ticker) {
     mvpChip.style.display = '';
+    mvpChip.style.cursor = 'pointer';
+    mvpChip.title = 'click for 14-day pick history';
     let txt = mp.ticker + (mp.live ? ` $${mp.live.toFixed(2)}` : '');
     if (mp.live && mp.ref_price) {
       const chg = (mp.live - mp.ref_price) / mp.ref_price * 100;
@@ -631,6 +678,7 @@ function render(d) {
   } else {
     mvpChip.style.display = 'none';
   }
+  renderMvpHistory(d.mvp_history || []);
 
   // Chart
   updateChart(d.history || []);
@@ -1039,6 +1087,13 @@ if (GIST_URL === "REPLACE_WITH_GIST_RAW_URL") {
 } else {
   refresh();
 }
+
+// MVP chip toggles the 14-day pick history table
+document.getElementById('mvp-chip').addEventListener('click', () => {
+  const sec = document.getElementById('mvp-history-sec');
+  sec.style.display = sec.style.display === 'none' ? '' : 'none';
+  if (sec.style.display === '') sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
 </script>
 </body>
 </html>
