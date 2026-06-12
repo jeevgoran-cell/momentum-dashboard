@@ -181,6 +181,7 @@
     border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
   }
   .tag-duck    { background: #1c2a3a; color: var(--blue);   border: 1px solid #2a4060; }
+  .tag-para    { background: #2a1c2a; color: #d670d6;       border: 1px solid #4a2060; }
   .tag-long    { background: #1c2a1c; color: var(--green);  border: 1px solid #1e4020; }
   .tag-short   { background: #2a1c1c; color: var(--red);    border: 1px solid #401e1e; }
   .tag-spotted { background: #2a2400; color: var(--yellow); border: 1px solid #4a3800; }
@@ -348,6 +349,10 @@
       <div id="closed-body"><div class="empty">Loading…</div></div>
     </section>
     <section>
+      <h2>Parabolic Slot <span class="badge" id="para-day-pnl" style="font-size:12px"></span></h2>
+      <div id="para-body"><div class="empty">No parabolic activity today</div></div>
+    </section>
+    <section>
       <h2>Duck Queue <span class="badge" id="duck-count">0</span></h2>
       <div id="duck-body"><div class="empty">Loading…</div></div>
     </section>
@@ -383,7 +388,9 @@
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────────────
-const GIST_URL = "https://calm-sunset-ddd3.jeevgoran.workers.dev/data";
+const GIST_URL = (window.location.hostname === 'localhost' || window.location.port === '8080' || window.location.hostname.endsWith('.trycloudflare.com'))
+  ? window.location.origin + '/data'
+  : "https://calm-sunset-ddd3.jeevgoran.workers.dev/data";
 const REFRESH_SECS = 5;
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -514,7 +521,8 @@ function holdStr(min) {
   return Math.floor(min/60) + 'h ' + (min%60) + 'm';
 }
 function sourceTag(src, slot) {
-  if (src === 'golden_duck') return '<span class="tag tag-duck">duck</span>';
+  if (src === 'golden_duck' || slot === 'duck') return '<span class="tag tag-duck">duck</span>';
+  if (slot === 'para')  return '<span class="tag tag-para">para</span>';
   if (slot === 'long')  return '<span class="tag tag-long">long</span>';
   if (slot === 'short') return '<span class="tag tag-short">short</span>';
   if (src && src.includes('claude')) return '<span class="tag tag-claude">claude</span>';
@@ -815,67 +823,71 @@ function render(d) {
   if (!d.closed_today.length) {
     cb.innerHTML = '<div class="empty">No closed trades today</div>';
   } else {
-    // Group by ticker
-    const groups = {};
+    let h = '<table><thead><tr><th>Ticker</th><th>Entry</th><th>Exit</th>'
+      + '<th>P&L $</th><th>P&L %</th><th>Hold</th><th>Reason</th></tr></thead><tbody>';
+    let paraTotal = 0, agentTotal = 0;
     for (const t of d.closed_today) {
-      if (!groups[t.ticker]) groups[t.ticker] = [];
-      groups[t.ticker].push(t);
-    }
-    let h = '<table><thead><tr><th>Ticker</th><th>P&L $</th><th>P&L %</th>'
-      + '<th>Avg Hold</th><th>Now</th><th>vs Exit</th><th>Reason</th></tr></thead><tbody>';
-    const tickerOrder = Object.keys(groups).sort((a,b) => {
-      const pa = groups[a].reduce((s,t)=>s+t.pnl,0);
-      const pb = groups[b].reduce((s,t)=>s+t.pnl,0);
-      return pb - pa;
-    });
-    for (const ticker of tickerOrder) {
-      const trades = groups[ticker];
-      const totalPnl  = trades.reduce((s,t) => s+t.pnl, 0);
-      const avgPnlPct = trades.reduce((s,t) => s+(t.pnl_pct||0), 0) / trades.length;
-      const avgHold   = trades.reduce((s,t) => s+(t.hold_min||0), 0) / trades.length;
-      const lastNow   = trades[trades.length-1].now;
-      const lastExit  = trades[trades.length-1].exit;
-      const lastVsPct = trades[trades.length-1].now_vs_exit_pct;
-      const pc = cls(totalPnl);
-      const nowStr = lastNow !== null ? `$${lastNow}` : '—';
-      const rightCall = lastNow !== null && lastNow < lastExit;
-      const wrongCall = lastNow !== null && lastNow > lastExit * 1.005;
-      const vsStr = lastVsPct !== null
-        ? `<span class="${lastVsPct <= 0 ? 'pos' : 'neg'}">${fmtPct(lastVsPct)}</span>` : '—';
-      const reasons = [...new Set(trades.map(t=>t.reason))].join(', ');
-      const gid = `cg-${ticker}`;
-      const multi = trades.length > 1;
-      const tag = trades[0].tag ? `<span style="font-size:9px;color:var(--yellow);margin-left:3px">${trades[0].tag}</span>` : '';
-      const tickerCell = multi
-        ? `<span style="cursor:pointer" onclick="toggleGroup('${gid}')">${gfLink(ticker)}${tag} <span id="${gid}-arrow" style="color:var(--txt2);font-size:10px">›</span> <span class="badge">${trades.length}</span></span>`
-        : `${gfLink(ticker)}${tag}`;
+      const pc = cls(t.pnl);
+      const badge = t.tag ? `<span class="tag tag-duck">${t.tag}</span>`
+                  : sourceTag(t.source || '', t.slot_kind || '');
       h += `<tr>
-        <td>${tickerCell}</td>
-        <td class="${pc}">${fmt$(totalPnl)}</td>
-        <td class="${pc}">${fmtPct(avgPnlPct)}</td>
-        <td>${holdStr(Math.round(avgHold))}</td>
-        <td class="${rightCall?'pos':wrongCall?'neg':'neu'}">${nowStr}</td>
-        <td>${vsStr}</td>
-        <td><span class="reason">${reasons}</span></td>
+        <td>${gfLink(t.ticker)} ${badge}</td>
+        <td>$${t.entry}</td>
+        <td>$${t.exit}</td>
+        <td class="${pc}">${fmt$(t.pnl)}</td>
+        <td class="${pc}">${fmtPct(t.pnl_pct)}</td>
+        <td>${holdStr(t.hold_min)}</td>
+        <td><span class="reason">${t.reason||'—'}</span></td>
       </tr>`;
-      if (multi) {
-        h += `<tr id="${gid}" style="display:none"><td colspan="7" style="padding:0">
-          <table style="width:100%;background:var(--bg3);font-size:11px">
-          <thead><tr style="color:var(--txt2)"><th style="padding-left:20px">Entry</th><th>Exit</th><th>P&L $</th><th>P&L %</th><th>Hold</th><th colspan="2">Reason</th></tr></thead><tbody>`;
-        for (const t of trades) {
-          const tpc = cls(t.pnl);
-          h += `<tr>
-            <td style="padding-left:20px">$${t.entry}</td><td>$${t.exit}</td>
-            <td class="${tpc}">${fmt$(t.pnl)}</td>
-            <td class="${tpc}">${fmtPct(t.pnl_pct)}</td>
-            <td>${holdStr(t.hold_min)}</td>
-            <td colspan="2"><span class="reason">${t.reason}</span></td>
-          </tr>`;
-        }
-        h += `</tbody></table></td></tr>`;
-      }
+      if (t.slot_kind === 'para') paraTotal += t.pnl;
+      else agentTotal += t.pnl;
     }
-    cb.innerHTML = h + '</tbody></table>';
+    h += `</tbody><tfoot><tr style="border-top:1px solid var(--border);font-size:12px;color:var(--txt2)">
+      <td colspan="3">Totals</td>
+      <td class="${cls(agentTotal)}" title="Agent closed trades">Agent ${fmt$(agentTotal)}</td>
+      <td class="${cls(paraTotal)}" title="Parabolic slot closed trades"><span class="tag tag-para">para</span> ${fmt$(paraTotal)}</td>
+      <td colspan="2"></td>
+    </tr></tfoot></table>`;
+    cb.innerHTML = h;
+  }
+
+  // Parabolic slot
+  const para = d.parabolic_slot || {};
+  const paraBody = document.getElementById('para-body');
+  const paraDayPnl = document.getElementById('para-day-pnl');
+  if (paraDayPnl && para.day_pnl !== undefined) {
+    paraDayPnl.textContent = fmt$(para.day_pnl);
+    paraDayPnl.className = 'badge ' + cls(para.day_pnl);
+  }
+  if (paraBody) {
+    const held   = para.held || null;
+    const closedP = para.closed || [];
+    if (!held && closedP.length === 0) {
+      paraBody.innerHTML = '<div class="empty">No parabolic activity today</div>';
+    } else {
+      let ph = '';
+      if (held) {
+        const uc = cls(held.unreal);
+        ph += `<table><thead><tr><th>Held</th><th>Qty</th><th>Entry</th><th>Live</th><th>Unreal $</th><th>HWM</th><th>Held</th></tr></thead><tbody><tr>
+          <td>${gfLink(held.sym)} <span class="tag tag-para">para</span></td>
+          <td>${held.qty}</td><td>$${held.entry}</td>
+          <td>${held.live != null ? `<span class="hi">$${held.live}</span>` : '—'}</td>
+          <td class="${uc}">${held.unreal != null ? fmt$(held.unreal) : '—'}</td>
+          <td>$${held.hwm}</td><td>${holdStr(held.hold_min)}</td>
+        </tr></tbody></table>`;
+      }
+      if (closedP.length > 0) {
+        ph += `<table style="margin-top:8px"><thead><tr><th>Ticker</th><th>Entry</th><th>Exit</th><th>P&amp;L $</th><th>P&amp;L %</th><th>Reason</th></tr></thead><tbody>`;
+        for (const t of closedP) {
+          const pc = cls(t.pnl);
+          ph += `<tr><td>${gfLink(t.sym)}</td><td>$${t.entry}</td><td>$${t.exit}</td>
+            <td class="${pc}">${fmt$(t.pnl)}</td><td class="${pc}">${fmtPct(t.pnl_pct)}</td>
+            <td><span class="reason">${t.reason||'—'}</span></td></tr>`;
+        }
+        ph += `</tbody></table>`;
+      }
+      paraBody.innerHTML = ph;
+    }
   }
 
   // Duck queue
