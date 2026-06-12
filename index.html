@@ -265,6 +265,14 @@
     <span class="label">🏆 MVP</span>
     <span class="value hi" id="k-mvp">—</span>
   </div>
+  <div class="kpi" style="border:1px solid var(--border);border-radius:4px;padding:2px 8px">
+    <span class="label">S&amp;P 500 (SPY)</span>
+    <span class="value" id="k-spy">—</span>
+  </div>
+  <div class="kpi" style="border:1px solid var(--border);border-radius:4px;padding:2px 8px">
+    <span class="label">Nasdaq (QQQ)</span>
+    <span class="value" id="k-qqq">—</span>
+  </div>
   <div id="status-bar">
     <span class="dot" id="dot"></span>
     <span id="data-age" style="font-weight:600"></span>
@@ -677,6 +685,20 @@ function render(d) {
   ur.textContent = fmt$(d.unrealized ?? 0); ur.className = 'value ' + cls(d.unrealized ?? 0);
   document.getElementById('k-cash').textContent = fmtK(d.cash ?? 0);
   document.getElementById('k-pos').textContent  = (d.open_count ?? '—') + ' / 12';
+
+  // Index chips — SPY (S&P 500) and QQQ (Nasdaq)
+  if (d.indices) {
+    ['SPY','QQQ'].forEach(sym => {
+      const el = document.getElementById('k-' + sym.toLowerCase());
+      if (!el) return;
+      const ix = d.indices[sym];
+      if (ix && ix.price != null) {
+        const arrow = ix.chg_pct >= 0 ? '▲' : '▼';
+        el.textContent = '$' + ix.price.toFixed(2) + ' ' + arrow + ' ' + (ix.chg_pct >= 0 ? '+' : '') + ix.chg_pct.toFixed(2) + '%';
+        el.className = 'value ' + (ix.chg_pct >= 0 ? 'pos' : 'neg');
+      }
+    });
+  }
 
   const wins   = d.closed_today.filter(t => t.pnl > 0).length;
   const losses = d.closed_today.filter(t => t.pnl < 0).length;
