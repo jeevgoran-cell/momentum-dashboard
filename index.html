@@ -817,36 +817,76 @@ function render(d) {
     pb.innerHTML = h + '</tbody></table>';
   }
 
-  // Closed today — grouped by ticker, collapsible
+  // Closed today — grouped by ticker, collapsible, includes para slot
   document.getElementById('closed-count').textContent = d.closed_today.length;
   const cb = document.getElementById('closed-body');
   if (!d.closed_today.length) {
     cb.innerHTML = '<div class="empty">No closed trades today</div>';
   } else {
-    let h = '<table><thead><tr><th>Ticker</th><th>Entry</th><th>Exit</th>'
-      + '<th>P&L $</th><th>P&L %</th><th>Hold</th><th>Reason</th></tr></thead><tbody>';
-    let paraTotal = 0, agentTotal = 0;
+    const groups = {};
     for (const t of d.closed_today) {
-      const pc = cls(t.pnl);
-      const badge = t.tag ? `<span class="tag tag-duck">${t.tag}</span>`
-                  : sourceTag(t.source || '', t.slot_kind || '');
+      if (!groups[t.ticker]) groups[t.ticker] = [];
+      groups[t.ticker].push(t);
+    }
+    const tickerOrder = Object.keys(groups).sort((a,b) => {
+      const pa = groups[a].reduce((s,t)=>s+t.pnl,0);
+      const pb = groups[b].reduce((s,t)=>s+t.pnl,0);
+      return pb - pa;
+    });
+    let h = '<table><thead><tr><th>Ticker</th><th>P&L $</th><th>P&L %</th>'
+      + '<th>Trades</th><th>Avg Hold</th><th>Reason</th></tr></thead><tbody>';
+    let paraTotal = 0, agentTotal = 0;
+    for (const ticker of tickerOrder) {
+      const trades  = groups[ticker];
+      const totalPnl  = trades.reduce((s,t) => s+t.pnl, 0);
+      const avgPnlPct = trades.reduce((s,t) => s+(t.pnl_pct||0), 0) / trades.length;
+      const avgHold   = trades.reduce((s,t) => s+(t.hold_min||0), 0) / trades.length;
+      const isPara    = trades.some(t => t.slot_kind === 'para');
+      const isDuck    = trades.some(t => t.slot_kind === 'duck' || t.source === 'golden_duck');
+      const badge     = isPara ? '<span class="tag tag-para">para</span>'
+                      : isDuck ? '<span class="tag tag-duck">duck</span>'
+                      : sourceTag(trades[0].source||'', trades[0].slot_kind||'');
+      const pc   = cls(totalPnl);
+      const gid  = `cg-${ticker}`;
+      const multi = trades.length > 1;
+      const tickerCell = multi
+        ? `<span style="cursor:pointer" onclick="toggleGroup('${gid}')">${gfLink(ticker)} ${badge} <span id="${gid}-arrow" style="color:var(--txt2);font-size:10px">›</span></span>`
+        : `${gfLink(ticker)} ${badge}`;
+      const reasons = [...new Set(trades.map(t=>t.reason).filter(Boolean))].join(', ');
       h += `<tr>
-        <td>${gfLink(t.ticker)} ${badge}</td>
-        <td>$${t.entry}</td>
-        <td>$${t.exit}</td>
-        <td class="${pc}">${fmt$(t.pnl)}</td>
-        <td class="${pc}">${fmtPct(t.pnl_pct)}</td>
-        <td>${holdStr(t.hold_min)}</td>
-        <td><span class="reason">${t.reason||'—'}</span></td>
+        <td>${tickerCell}</td>
+        <td class="${pc}">${fmt$(totalPnl)}</td>
+        <td class="${pc}">${fmtPct(avgPnlPct)}</td>
+        <td style="color:var(--txt2)">${trades.length}</td>
+        <td>${holdStr(Math.round(avgHold))}</td>
+        <td><span class="reason">${reasons||'—'}</span></td>
       </tr>`;
-      if (t.slot_kind === 'para') paraTotal += t.pnl;
-      else agentTotal += t.pnl;
+      if (multi) {
+        h += `<tr id="${gid}" style="display:none"><td colspan="6" style="padding:0">
+          <table style="width:100%;background:var(--bg3);font-size:11px">
+          <thead><tr style="color:var(--txt2)">
+            <th style="padding-left:20px">Entry</th><th>Exit</th>
+            <th>P&L $</th><th>P&L %</th><th>Hold</th><th>Reason</th>
+          </tr></thead><tbody>`;
+        for (const t of trades) {
+          const tpc = cls(t.pnl);
+          h += `<tr>
+            <td style="padding-left:20px">$${t.entry}</td><td>$${t.exit}</td>
+            <td class="${tpc}">${fmt$(t.pnl)}</td>
+            <td class="${tpc}">${fmtPct(t.pnl_pct)}</td>
+            <td>${holdStr(t.hold_min)}</td>
+            <td><span class="reason">${t.reason||'—'}</span></td>
+          </tr>`;
+        }
+        h += `</tbody></table></td></tr>`;
+      }
+      if (isPara) paraTotal += totalPnl; else agentTotal += totalPnl;
     }
     h += `</tbody><tfoot><tr style="border-top:1px solid var(--border);font-size:12px;color:var(--txt2)">
-      <td colspan="3">Totals</td>
+      <td>Totals</td>
       <td class="${cls(agentTotal)}" title="Agent closed trades">Agent ${fmt$(agentTotal)}</td>
       <td class="${cls(paraTotal)}" title="Parabolic slot closed trades"><span class="tag tag-para">para</span> ${fmt$(paraTotal)}</td>
-      <td colspan="2"></td>
+      <td colspan="3"></td>
     </tr></tfoot></table>`;
     cb.innerHTML = h;
   }
