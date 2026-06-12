@@ -186,6 +186,8 @@
   .tag-short   { background: #2a1c1c; color: var(--red);    border: 1px solid #401e1e; }
   .tag-spotted { background: #2a2400; color: var(--yellow); border: 1px solid #4a3800; }
   .tag-claude { background: #261c3a; color: var(--purple);  border: 1px solid #3a2060; }
+  .tag-lev    { background: #1c2a2a; color: #3dd6d6;        border: 1px solid #1e4040; }
+  .tag-candle { background: #2a241c; color: #e8b339;        border: 1px solid #5a4a20; }
 
   .reason { font-size: 11px; color: var(--txt2); }
   .empty  { padding: 20px; text-align: center; color: var(--txt2); font-size: 12px; }
@@ -523,6 +525,8 @@ function holdStr(min) {
 function sourceTag(src, slot) {
   if (src === 'golden_duck' || slot === 'duck') return '<span class="tag tag-duck">duck</span>';
   if (slot === 'para')  return '<span class="tag tag-para">para</span>';
+  if (slot === 'lev')   return '<span class="tag tag-lev">lev</span>';
+  if (slot === 'candle') return '<span class="tag tag-candle">🕯️ candle</span>';
   if (slot === 'long')  return '<span class="tag tag-long">long</span>';
   if (slot === 'short') return '<span class="tag tag-short">short</span>';
   if (src && src.includes('claude')) return '<span class="tag tag-claude">claude</span>';
@@ -811,7 +815,7 @@ function render(d) {
         <td class="${p.hwm_pct>0?'pos':'neu'}">${fmtPct(p.hwm_pct)}</td>
         <td>${holdStr(p.hold_min)}</td>
         <td>${p.conf ?? '—'}</td>
-        <td><span class="tag ${p.slot_kind==='long'?'tag-long':p.slot_kind==='duck'?'tag-duck':'tag-short'}">${p.slot_kind||'—'}</span></td>
+        <td><span class="tag ${p.slot_kind==='long'?'tag-long':p.slot_kind==='duck'?'tag-duck':p.slot_kind==='para'?'tag-para':p.slot_kind==='lev'?'tag-lev':p.slot_kind==='candle'?'tag-candle':'tag-short'}">${p.slot_kind==='candle'?'🕯️ candle':(p.slot_kind||'—')}</span></td>
       </tr>`;
     }
     pb.innerHTML = h + '</tbody></table>';
@@ -843,7 +847,9 @@ function render(d) {
       const avgHold   = trades.reduce((s,t) => s+(t.hold_min||0), 0) / trades.length;
       const isPara    = trades.some(t => t.slot_kind === 'para');
       const isDuck    = trades.some(t => t.slot_kind === 'duck' || t.source === 'golden_duck');
+      const isCandle  = trades.some(t => t.slot_kind === 'candle');
       const badge     = isPara ? '<span class="tag tag-para">para</span>'
+                      : isCandle ? '<span class="tag tag-candle">🕯️ candle</span>'
                       : isDuck ? '<span class="tag tag-duck">duck</span>'
                       : sourceTag(trades[0].source||'', trades[0].slot_kind||'');
       const pc   = cls(totalPnl);
