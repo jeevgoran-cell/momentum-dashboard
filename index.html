@@ -361,7 +361,8 @@
     </section>
     <section id="weekly-pnl-sec">
       <h2>Weekly P&amp;L — Mon to Fri <span id="weekly-pnl-total" style="margin-left:8px;font-size:13px;font-weight:700"></span></h2>
-      <div style="padding:14px 18px"><canvas id="weekly-pnl-chart" style="max-height:200px"></canvas></div>
+      <div style="padding:14px 18px"><canvas id="weekly-pnl-chart" style="max-height:180px"></canvas></div>
+      <div id="weekly-stats-row" style="display:flex;gap:0;border-top:1px solid #21262d;padding:0 8px 4px"></div>
     </section>
   </div>
 
@@ -534,11 +535,43 @@ function renderWeeklyPnl(days) {
   const totEl = document.getElementById('weekly-pnl-total');
   totEl.textContent = `${total >= 0 ? '+' : ''}$${total.toFixed(0)} week`;
   totEl.className = total >= 0 ? 'pos' : 'neg';
+
+  // Stats row below chart
+  const statsRow = document.getElementById('weekly-stats-row');
+  statsRow.innerHTML = days.map(r => {
+    if (r.pnl == null) return `<div style="flex:1;padding:8px 4px;text-align:center;color:#484f58;font-size:10px">${r.day}<br>—</div>`;
+    const fmt = (v, p=0) => v == null ? '—' : `${v>=0?'+':''}$${Math.abs(v).toFixed(p)}`;
+    const col = (v) => v == null ? '#8b949e' : v >= 0 ? '#3fb950' : '#f85149';
+    const wr  = r.wr_pct != null ? `<span style="color:#e3b341">${r.wr_pct}%</span>` : '<span style="color:#484f58">—</span>';
+    const real = r.realized != null
+      ? `<span style="color:${col(r.realized)}">${fmt(r.realized)}</span>`
+      : '<span style="color:#484f58">—</span>';
+    const unreal = r.unrealized != null
+      ? `<span style="color:${col(r.unrealized)}">${fmt(r.unrealized)}</span>`
+      : '<span style="color:#484f58">—</span>';
+    const trades = r.n_trades != null ? `<span style="color:#8b949e">${r.n_trades}t</span>` : '';
+    return `<div style="flex:1;padding:8px 4px;text-align:center;font-size:10px;font-family:'SF Mono','Fira Code',monospace;border-right:1px solid #21262d">
+      <div style="color:#8b949e;margin-bottom:3px">${r.day}</div>
+      <div style="margin-bottom:1px">${real} <span style="color:#484f58">R</span></div>
+      <div style="margin-bottom:1px">${unreal} <span style="color:#484f58">U</span></div>
+      <div>${wr} WR ${trades}</div>
+    </div>`;
+  }).join('');
+
   const ctx = document.getElementById('weekly-pnl-chart').getContext('2d');
+  const tooltipCb = (c) => {
+    const r = days[c.dataIndex];
+    const lines = [` Total  ${c.parsed.y >= 0 ? '+' : ''}$${(c.parsed.y ?? 0).toFixed(2)}`];
+    if (r.realized   != null) lines.push(` Real   ${r.realized >= 0 ? '+' : ''}$${r.realized.toFixed(2)}`);
+    if (r.unrealized != null) lines.push(` Unreal ${r.unrealized >= 0 ? '+' : ''}$${r.unrealized.toFixed(2)}`);
+    if (r.wr_pct     != null) lines.push(` WR     ${r.wr_pct}% (${r.n_trades} trades)`);
+    return lines;
+  };
   if (weeklyChart) {
     weeklyChart.data.labels = labels;
     weeklyChart.data.datasets[0].data = vals;
     weeklyChart.data.datasets[0].backgroundColor = colors;
+    weeklyChart.options.plugins.tooltip.callbacks.label = tooltipCb;
     weeklyChart.update('none');
     return;
   }
@@ -549,7 +582,7 @@ function renderWeeklyPnl(days) {
       responsive: true,
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: c => ` $${(c.parsed.y ?? 0).toFixed(2)}` } },
+        tooltip: { callbacks: { label: tooltipCb } },
       },
       scales: {
         x: { grid: { display: false }, ticks: { color: '#8b949e', font: { family: "'SF Mono','Fira Code',monospace", size: 11 } } },
