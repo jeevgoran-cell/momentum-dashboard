@@ -351,6 +351,10 @@
       <h2>Qwen Local LLM — Duck BUYs <span class="badge" id="qwen-count">0</span></h2>
       <div id="qwen-body"><div class="empty">Loading…</div></div>
     </section>
+    <section id="weekly-pnl-sec">
+      <h2>Weekly P&amp;L — Mon to Fri <span id="weekly-pnl-total" style="margin-left:8px;font-size:13px;font-weight:700"></span></h2>
+      <div style="padding:14px 18px"><canvas id="weekly-pnl-chart" style="max-height:200px"></canvas></div>
+    </section>
   </div>
 
   <!-- Right column: pattern alerts (top) + activity feed (scrollable) -->
@@ -506,6 +510,45 @@ function sourceTag(src, slot) {
   if (slot === 'short') return '<span class="tag tag-short">short</span>';
   if (src && src.includes('claude')) return '<span class="tag tag-claude">claude</span>';
   return '';
+}
+
+let weeklyChart = null;
+
+function renderWeeklyPnl(days) {
+  const sec = document.getElementById('weekly-pnl-sec');
+  if (!days || !days.length) { sec.style.display = 'none'; return; }
+  sec.style.display = '';
+  const labels = days.map(r => `${r.day} ${r.date.slice(5)}`);
+  const vals   = days.map(r => r.pnl);
+  const colors = vals.map(v => v == null ? 'transparent'
+    : v >= 0 ? 'rgba(63,185,80,0.75)' : 'rgba(248,81,73,0.75)');
+  const total = vals.reduce((s, v) => s + (v || 0), 0);
+  const totEl = document.getElementById('weekly-pnl-total');
+  totEl.textContent = `${total >= 0 ? '+' : ''}$${total.toFixed(0)} week`;
+  totEl.className = total >= 0 ? 'pos' : 'neg';
+  const ctx = document.getElementById('weekly-pnl-chart').getContext('2d');
+  if (weeklyChart) {
+    weeklyChart.data.labels = labels;
+    weeklyChart.data.datasets[0].data = vals;
+    weeklyChart.data.datasets[0].backgroundColor = colors;
+    weeklyChart.update('none');
+    return;
+  }
+  weeklyChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ data: vals, backgroundColor: colors, borderRadius: 4 }] },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => ` $${(c.parsed.y ?? 0).toFixed(2)}` } },
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: '#8b949e', font: { family: "'SF Mono','Fira Code',monospace", size: 11 } } },
+        y: { grid: { color: '#21262d' }, ticks: { color: '#8b949e', callback: v => '$' + v } },
+      },
+    },
+  });
 }
 
 let mvpHistData = [];
@@ -679,6 +722,7 @@ function render(d) {
     mvpChip.style.display = 'none';
   }
   renderMvpHistory(d.mvp_history || []);
+  renderWeeklyPnl(d.weekly_pnl || []);
 
   // Chart
   updateChart(d.history || []);
