@@ -653,6 +653,15 @@ function startCountdown() {
   }, 1000);
 }
 
+// All times shown in Ottawa (Eastern) time.
+function ottawaTime(iso) {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleTimeString('en-US',
+      {timeZone: 'America/Toronto', hour: '2-digit', minute: '2-digit'});
+  } catch (e) { return (iso || '').slice(11, 16); }
+}
+
 function renderRegimeBar(d) {
   const is  = d.intraday_sentiment;
   const bar = document.getElementById('regime-bar');
@@ -662,7 +671,7 @@ function renderRegimeBar(d) {
   const emoji = sent === 'bullish' ? '🟢' : sent === 'bearish' ? '🔴' : '🟡';
   const src   = is.source === 'intraday'
     ? `intraday · ${is.age_min ?? '?'}m ago`
-    : `morning · ${(is.ts || '').slice(11,16)} UTC`;
+    : `morning · ${ottawaTime(is.ts)} ET`;
   document.getElementById('rb-label').textContent  = `${emoji} MARKET ${sent.toUpperCase()}  ${conf}%`;
   document.getElementById('rb-reason').textContent = is.reason || is.qwen_reason || '';
   document.getElementById('rb-meta').textContent   = src;
@@ -686,7 +695,7 @@ function render(d) {
     sentSec.style.display = '';
     const today = new Date().toISOString().slice(0,10);
     document.getElementById('sent-ts').textContent =
-      ms.date !== today ? `(${ms.date})` : `as of ${(ms.ts||'').slice(11,16)} UTC`;
+      ms.date !== today ? `(${ms.date})` : `as of ${ottawaTime(ms.ts)} ET`;
     const qEl = document.getElementById('sc-qwen');
     qEl.textContent = sentEmoji(ms.qwen_sentiment) + ' ' + (ms.qwen_sentiment||'').toUpperCase();
     qEl.className   = 'sc-value ' + sentColor(ms.qwen_sentiment);
@@ -1077,7 +1086,7 @@ function render(d) {
   lastDataTs = ts.getTime();
   tickDataAge();
   document.getElementById('status-label').textContent =
-    'updated ' + ts.toLocaleTimeString();
+    'updated ' + ottawaTime(d.ts) + ' ET';
   document.getElementById('error-banner').style.display = 'none';
 }
 
@@ -1120,8 +1129,13 @@ function renderPatterns(alerts) {
     const blockBadge = a.block_label
       ? `<span style="font-size:9px;font-weight:700;color:${blockBadgeColor[a.block_label]||'var(--txt2)'};background:var(--bg3);border:1px solid currentColor;border-radius:3px;padding:1px 4px;margin-left:6px;opacity:.85">🚫 ${a.block_label}</span>`
       : '';
+    const hotBadge = a.superfast
+      ? `<span title="fastest mover: ${a.velocity!=null?a.velocity+'%/min':''}" style="font-size:9px;font-weight:700;color:#ffd000;background:#3a2a00;border:1px solid #ffd000;border-radius:3px;padding:1px 4px;margin-left:6px">🚀 superfast</span>`
+      : a.hot
+      ? `<span title="moving up fast: ${a.velocity!=null?a.velocity+'%/min':''}" style="font-size:9px;font-weight:700;color:#ff5a1f;background:var(--bg3);border:1px solid currentColor;border-radius:3px;padding:1px 4px;margin-left:6px">🔥 hot</span>`
+      : '';
     h += `<div class="pat-item">
-      <span class="pat-ticker">${gfLink(a.ticker, a.otc)} ${a.otc ? '<span style="font-size:9px;color:var(--txt2)">OTC</span>' : ''}${blockBadge}</span>
+      <span class="pat-ticker">${gfLink(a.ticker, a.otc)} ${a.otc ? '<span style="font-size:9px;color:var(--txt2)">OTC</span>' : ''}${hotBadge}${blockBadge}</span>
       <span class="pat-pct ${isMonster ? 'monster' : ''}">${pctStr}</span>
       <span class="pat-price">${priceChain}</span>
     </div>`;
@@ -1144,7 +1158,7 @@ function renderFeed(events) {
     const ageSec = Math.round((now - ts) / 1000);
     const timeStr = ageSec < 60 ? `${ageSec}s ago`
       : ageSec < 3600 ? `${Math.floor(ageSec / 60)}m ago`
-      : ts.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+      : ottawaTime(ev.ts);
 
     let itemCls, icon, top, sub = '';
 
@@ -1197,7 +1211,8 @@ function renderFeed(events) {
       icon    = s === 'bullish' ? '🟢' : s === 'bearish' ? '🔴' : '🟡';
       const confPct = ((ev.confidence || 0) * 100).toFixed(0);
       const spyStr  = ev.spy_pct != null ? ` · SPY ${ev.spy_pct >= 0 ? '+' : ''}${ev.spy_pct}%` : '';
-      top = `<span style="font-weight:700">MARKET ${s.toUpperCase()}</span> <span class="neu">${confPct}%${spyStr}</span>`;
+      const mdl = (ev.models && ev.models.length) ? ` <span class="neu">[${ev.models.join(', ')}]</span>` : '';
+      top = `<span style="font-weight:700">MARKET ${s.toUpperCase()}</span> <span class="neu">${confPct}%${spyStr}</span>${mdl}`;
       sub = ev.reason || '';
 
     } else {
