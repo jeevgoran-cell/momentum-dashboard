@@ -189,6 +189,22 @@
   .tag-lev    { background: #1c2a2a; color: #3dd6d6;        border: 1px solid #1e4040; }
   .tag-candle { background: #2a241c; color: #e8b339;        border: 1px solid #5a4a20; }
   .tag-rocket { background: #2a1c14; color: #ff8c42;        border: 1px solid #5a3014; }
+  .mvp-card { padding: 14px 16px; display: grid; grid-template-columns: auto 1fr; gap: 14px; }
+  .mvp-left { display: flex; flex-direction: column; gap: 8px; min-width: 160px; }
+  .mvp-ticker { font-size: 28px; font-weight: 700; color: var(--blue); letter-spacing: 0.04em; }
+  .mvp-conviction { display: flex; gap: 3px; align-items: center; }
+  .mvp-pip { width: 10px; height: 10px; border-radius: 2px; background: var(--bg3); border: 1px solid var(--border); }
+  .mvp-pip.filled { background: var(--yellow); border-color: var(--yellow); }
+  .mvp-meta { font-size: 11px; color: var(--txt2); }
+  .mvp-levels { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+  .mvp-level-row { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; padding: 4px 8px; border-radius: 4px; background: var(--bg3); border: 1px solid var(--border); }
+  .mvp-level-row .lbl { color: var(--txt2); }
+  .mvp-right { display: flex; flex-direction: column; gap: 8px; }
+  .mvp-catalyst { font-size: 12px; color: var(--yellow); font-weight: 600; }
+  .mvp-thesis { font-size: 12px; color: var(--txt); line-height: 1.6; }
+  .mvp-risks { font-size: 11px; color: var(--txt2); font-style: italic; }
+  .mvp-live-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 2px; }
+  .mvp-live-pill { background: var(--bg3); border: 1px solid var(--border); border-radius: 20px; padding: 3px 10px; font-size: 12px; font-weight: 600; }
 
   .reason { font-size: 11px; color: var(--txt2); }
   .empty  { padding: 20px; text-align: center; color: var(--txt2); font-size: 12px; }
@@ -343,6 +359,12 @@
       <h2>Day P&L &amp; Equity</h2>
       <div id="chart-wrap"><canvas id="pnl-chart"></canvas></div>
     </section>
+    <!-- MVP Pick -->
+    <section id="mvp-section" style="display:none">
+      <h2>🏆 MVP Pick — Manual Swing Trade</h2>
+      <div id="mvp-body"></div>
+    </section>
+
     <section>
       <h2>Open Positions <span class="badge" id="pos-count">0</span></h2>
       <div id="pos-body"><div class="empty">Loading…</div></div>
@@ -680,6 +702,57 @@ function renderRegimeBar(d) {
   bar.className = `visible ${sent}`;
 }
 
+function renderMvpSlot(d) {
+  const sec = document.getElementById('mvp-section');
+  const body = document.getElementById('mvp-body');
+  if (!sec || !body) return;
+  const p = d.mvp_pick;
+  if (!p || !p.ticker) { sec.style.display = 'none'; return; }
+  sec.style.display = '';
+  let chgHtml = '';
+  if (p.live && p.ref_price) {
+    const chg = (p.live - p.ref_price) / p.ref_price * 100;
+    const arrow = chg >= 0 ? '▲' : '▼';
+    const c = chg >= 0 ? 'pos' : 'neg';
+    chgHtml = `<span class="${c}" style="font-size:11px">${arrow} ${chg >= 0 ? '+' : ''}${chg.toFixed(2)}% since pick ($${p.ref_price.toFixed(2)})</span>`;
+  }
+  const conv = p.conviction || 0;
+  let pips = '';
+  for (let i = 1; i <= 10; i++) pips += `<div class="mvp-pip${i <= conv ? ' filled' : ''}"></div>`;
+  const live = p.live;
+  let liveHtml = '';
+  if (live) {
+    const inZone = live >= p.entry_zone_low && live <= p.entry_zone_high;
+    const aboveZone = live > p.entry_zone_high;
+    const atStop = live <= p.stop;
+    const liveClass = atStop ? 'neg' : inZone ? 'pos' : aboveZone ? 'neu' : 'hi';
+    const zoneLabel = atStop ? '⚠ at/below stop' : inZone ? '✓ in entry zone' : aboveZone ? '↑ above zone' : '↓ below zone';
+    liveHtml = `<span class="mvp-live-pill hi">Live $${live.toFixed(2)}</span> ${chgHtml} <span class="${liveClass}" style="font-size:11px">${zoneLabel}</span>`;
+  }
+  const mid = (p.entry_zone_low + p.entry_zone_high) / 2;
+  const rPct = mid > 0 ? ((p.target - mid) / mid * 100).toFixed(1) : '—';
+  const sPct = mid > 0 ? ((p.stop - mid) / mid * 100).toFixed(1) : '—';
+  body.innerHTML = `
+    <div class="mvp-card">
+      <div class="mvp-left">
+        <div class="mvp-ticker">${gfLink(p.ticker)}</div>
+        <div class="mvp-conviction">${pips}</div>
+        <div class="mvp-meta">Conviction ${conv}/10 · ${p.horizon_days}d horizon · 🧪 paper</div>
+        <div class="mvp-levels">
+          <div class="mvp-level-row"><span class="lbl">Entry</span><span class="hi">$${p.entry_zone_low}–$${p.entry_zone_high}</span></div>
+          <div class="mvp-level-row"><span class="lbl">Target</span><span class="pos">$${p.target} (+${rPct}%)</span></div>
+          <div class="mvp-level-row"><span class="lbl">Stop</span><span class="neg">$${p.stop} (${sPct}%)</span></div>
+        </div>
+        <div class="mvp-live-row">${liveHtml}</div>
+      </div>
+      <div class="mvp-right">
+        <div class="mvp-catalyst">📌 ${p.catalyst || ''}</div>
+        <div class="mvp-thesis">${p.thesis || ''}</div>
+        <div class="mvp-risks">${p.risks ? '⚠ ' + p.risks : ''}</div>
+      </div>
+    </div>`;
+}
+
 function render(d) {
   // Regime bar — top overall sentiment status
   renderRegimeBar(d);
@@ -799,6 +872,7 @@ function render(d) {
   } else {
     mvpChip.style.display = 'none';
   }
+  renderMvpSlot(d);
   renderMvpHistory(d.mvp_history || []);
   renderWeeklyPnl(d.weekly_pnl || []);
 
@@ -932,21 +1006,60 @@ function render(d) {
       let ph = '';
       if (held) {
         const uc = cls(held.unreal);
-        ph += `<table><thead><tr><th>Held</th><th>Qty</th><th>Entry</th><th>Live</th><th>Unreal $</th><th>HWM</th><th>Held</th></tr></thead><tbody><tr>
+        ph += `<table><thead><tr><th>Held</th><th>Qty</th><th>Entry</th><th>Live</th><th>Unreal $</th><th>HWM</th><th>Bought</th><th>Held</th></tr></thead><tbody><tr>
           <td>${gfLink(held.sym)} <span class="tag tag-para">para</span></td>
           <td>${held.qty}</td><td>$${held.entry}</td>
           <td>${held.live != null ? `<span class="hi">$${held.live}</span>` : '—'}</td>
           <td class="${uc}">${held.unreal != null ? fmt$(held.unreal) : '—'}</td>
-          <td>$${held.hwm}</td><td>${holdStr(held.hold_min)}</td>
+          <td>$${held.hwm}</td>
+          <td style="font-size:10px;color:var(--txt2)">${ottawaTime(held.buy_ts)}</td>
+          <td>${holdStr(held.hold_min)}</td>
         </tr></tbody></table>`;
       }
       if (closedP.length > 0) {
-        ph += `<table style="margin-top:8px"><thead><tr><th>Ticker</th><th>Entry</th><th>Exit</th><th>P&amp;L $</th><th>P&amp;L %</th><th>Reason</th></tr></thead><tbody>`;
-        for (const t of closedP) {
-          const pc = cls(t.pnl);
-          ph += `<tr><td>${gfLink(t.sym)}</td><td>$${t.entry}</td><td>$${t.exit}</td>
-            <td class="${pc}">${fmt$(t.pnl)}</td><td class="${pc}">${fmtPct(t.pnl_pct)}</td>
-            <td><span class="reason">${t.reason||'—'}</span></td></tr>`;
+        // group same ticker, collapsible, with buy->sell timestamps
+        const pg = {};
+        for (const t of closedP) { (pg[t.sym] = pg[t.sym] || []).push(t); }
+        const pOrder = Object.keys(pg).sort((a,b) =>
+          pg[b].reduce((s,t)=>s+t.pnl,0) - pg[a].reduce((s,t)=>s+t.pnl,0));
+        ph += `<table style="margin-top:8px"><thead><tr><th>Ticker</th><th>P&amp;L $</th><th>P&amp;L %</th><th>Trades</th><th>Time (ET)</th><th>Reason</th></tr></thead><tbody>`;
+        for (const sym of pOrder) {
+          const trades = pg[sym];
+          const totalPnl  = trades.reduce((s,t)=>s+t.pnl, 0);
+          const avgPnlPct = trades.reduce((s,t)=>s+(t.pnl_pct||0), 0) / trades.length;
+          const pc = cls(totalPnl);
+          const gid = `pcg-${sym}`;
+          const multi = trades.length > 1;
+          const catB = trades.some(t=>t.cat) ? ' <span class="tag tag-cat">⚡ CAT</span>' : '';
+          const tcell = multi
+            ? `<span style="cursor:pointer" onclick="toggleGroup('${gid}')">${gfLink(sym)} <span class="tag tag-para">para</span>${catB} <span id="${gid}-arrow" style="color:var(--txt2);font-size:10px">›</span></span>`
+            : `${gfLink(sym)} <span class="tag tag-para">para</span>${catB}`;
+          const t0 = trades[0];
+          const timeStr = multi ? `${trades.length}×` : `${ottawaTime(t0.buy_ts)}→${ottawaTime(t0.sell_ts)}`;
+          const reasons = [...new Set(trades.map(t=>t.reason).filter(Boolean))].join(', ');
+          ph += `<tr>
+            <td>${tcell}</td>
+            <td class="${pc}">${fmt$(totalPnl)}</td>
+            <td class="${pc}">${fmtPct(avgPnlPct)}</td>
+            <td style="color:var(--txt2)">${trades.length}</td>
+            <td style="font-size:10px;color:var(--txt2)">${timeStr}</td>
+            <td><span class="reason">${reasons||'—'}</span></td>
+          </tr>`;
+          if (multi) {
+            ph += `<tr id="${gid}" style="display:none"><td colspan="6" style="padding:0">
+              <table style="width:100%;background:var(--bg3);font-size:11px">
+              <thead><tr style="color:var(--txt2)"><th style="padding-left:20px">Entry</th><th>Exit</th><th>P&amp;L $</th><th>P&amp;L %</th><th>Bought→Sold (ET)</th><th>Reason</th></tr></thead><tbody>`;
+            for (const t of trades) {
+              const tpc = cls(t.pnl);
+              ph += `<tr>
+                <td style="padding-left:20px">$${t.entry}</td><td>$${t.exit}</td>
+                <td class="${tpc}">${fmt$(t.pnl)}</td><td class="${tpc}">${fmtPct(t.pnl_pct)}</td>
+                <td style="color:var(--txt2)">${ottawaTime(t.buy_ts)}→${ottawaTime(t.sell_ts)}</td>
+                <td><span class="reason">${t.reason||'—'}</span></td>
+              </tr>`;
+            }
+            ph += `</tbody></table></td></tr>`;
+          }
         }
         ph += `</tbody></table>`;
       }
