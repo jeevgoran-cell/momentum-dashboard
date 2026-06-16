@@ -803,16 +803,17 @@ function render(d) {
   // Chart
   updateChart(d.history || []);
 
-  // Open positions
-  document.getElementById('pos-count').textContent = d.positions.length;
+  // Open positions — parabolic slot shown in its own panel below, not here
+  const mainPos = (d.positions || []).filter(p => p.slot_kind !== 'para');
+  document.getElementById('pos-count').textContent = mainPos.length;
   const pb = document.getElementById('pos-body');
-  if (!d.positions.length) {
+  if (!mainPos.length) {
     pb.innerHTML = '<div class="empty">No open positions</div>';
   } else {
     let h = '<table><thead><tr><th>Ticker</th><th>Qty</th><th>Avg</th><th>Live</th>'
       + '<th>Unreal $</th><th>Unreal %</th><th>HWM</th><th>HWM %</th>'
       + '<th>Held</th><th>Conf</th><th>Slot</th></tr></thead><tbody>';
-    for (const p of d.positions) {
+    for (const p of mainPos) {
       const uc = cls(p.unreal);
       h += `<tr>
         <td>${gfLink(p.ticker)} ${sourceTag(p.source, p.slot_kind)}</td>
@@ -830,14 +831,17 @@ function render(d) {
     pb.innerHTML = h + '</tbody></table>';
   }
 
-  // Closed today — grouped by ticker, collapsible, includes para slot
-  document.getElementById('closed-count').textContent = d.closed_today.length;
+  // Closed today — grouped by ticker, collapsible. Parabolic slot is shown in
+  // its own panel below, so para trades are excluded here (per-trade filter, so
+  // a ticker traded by both duck and para keeps its non-para portion).
+  const mainClosed = (d.closed_today || []).filter(t => t.slot_kind !== 'para');
+  document.getElementById('closed-count').textContent = mainClosed.length;
   const cb = document.getElementById('closed-body');
-  if (!d.closed_today.length) {
+  if (!mainClosed.length) {
     cb.innerHTML = '<div class="empty">No closed trades today</div>';
   } else {
     const groups = {};
-    for (const t of d.closed_today) {
+    for (const t of mainClosed) {
       if (!groups[t.ticker]) groups[t.ticker] = [];
       groups[t.ticker].push(t);
     }
@@ -868,12 +872,14 @@ function render(d) {
         ? `<span style="cursor:pointer" onclick="toggleGroup('${gid}')">${gfLink(ticker)} ${badge} <span id="${gid}-arrow" style="color:var(--txt2);font-size:10px">›</span></span>`
         : `${gfLink(ticker)} ${badge}`;
       const reasons = [...new Set(trades.map(t=>t.reason).filter(Boolean))].join(', ');
+      const oneTime = (trades.length===1 && (trades[0].buy_ts||trades[0].sell_ts))
+        ? `<div style="font-size:9px;color:var(--txt2)">${ottawaTime(trades[0].buy_ts)}→${ottawaTime(trades[0].sell_ts)} ET</div>` : '';
       h += `<tr>
         <td>${tickerCell}</td>
         <td class="${pc}">${fmt$(totalPnl)}</td>
         <td class="${pc}">${fmtPct(avgPnlPct)}</td>
         <td style="color:var(--txt2)">${trades.length}</td>
-        <td>${holdStr(Math.round(avgHold))}</td>
+        <td>${holdStr(Math.round(avgHold))}${oneTime}</td>
         <td><span class="reason">${reasons||'—'}</span></td>
       </tr>`;
       if (multi) {
@@ -881,14 +887,16 @@ function render(d) {
           <table style="width:100%;background:var(--bg3);font-size:11px">
           <thead><tr style="color:var(--txt2)">
             <th style="padding-left:20px">Entry</th><th>Exit</th>
-            <th>P&L $</th><th>P&L %</th><th>Hold</th><th>Reason</th>
+            <th>P&L $</th><th>P&L %</th><th>Time (ET)</th><th>Hold</th><th>Reason</th>
           </tr></thead><tbody>`;
         for (const t of trades) {
           const tpc = cls(t.pnl);
+          const tspan = (t.buy_ts||t.sell_ts) ? `${ottawaTime(t.buy_ts)}→${ottawaTime(t.sell_ts)}` : '—';
           h += `<tr>
             <td style="padding-left:20px">$${t.entry}</td><td>$${t.exit}</td>
             <td class="${tpc}">${fmt$(t.pnl)}</td>
             <td class="${tpc}">${fmtPct(t.pnl_pct)}</td>
+            <td style="color:var(--txt2)">${tspan}</td>
             <td>${holdStr(t.hold_min)}</td>
             <td><span class="reason">${t.reason||'—'}</span></td>
           </tr>`;
@@ -898,10 +906,9 @@ function render(d) {
       if (isPara) paraTotal += totalPnl; else agentTotal += totalPnl;
     }
     h += `</tbody><tfoot><tr style="border-top:1px solid var(--border);font-size:12px;color:var(--txt2)">
-      <td>Totals</td>
-      <td class="${cls(agentTotal)}" title="Agent closed trades">Agent ${fmt$(agentTotal)}</td>
-      <td class="${cls(paraTotal)}" title="Parabolic slot closed trades"><span class="tag tag-para">para</span> ${fmt$(paraTotal)}</td>
-      <td colspan="3"></td>
+      <td>Total <span style="color:var(--txt2)">(parabolic → own panel)</span></td>
+      <td class="${cls(agentTotal)}" title="Agent + duck + candle closed trades">${fmt$(agentTotal)}</td>
+      <td colspan="4"></td>
     </tr></tfoot></table>`;
     cb.innerHTML = h;
   }
@@ -1134,8 +1141,11 @@ function renderPatterns(alerts) {
       : a.hot
       ? `<span title="moving up fast: ${a.velocity!=null?a.velocity+'%/min':''}" style="font-size:9px;font-weight:700;color:#ff5a1f;background:var(--bg3);border:1px solid currentColor;border-radius:3px;padding:1px 4px;margin-left:6px">🔥 hot</span>`
       : '';
+    const catBadge = a.catalyst_strong
+      ? `<span title="strong LLM catalyst (real catalyst, not chop)" style="font-size:9px;font-weight:700;color:#9b8cff;background:var(--bg3);border:1px solid #9b8cff;border-radius:3px;padding:1px 4px;margin-left:6px">⚡ CAT</span>`
+      : '';
     h += `<div class="pat-item">
-      <span class="pat-ticker">${gfLink(a.ticker, a.otc)} ${a.otc ? '<span style="font-size:9px;color:var(--txt2)">OTC</span>' : ''}${hotBadge}${blockBadge}</span>
+      <span class="pat-ticker">${gfLink(a.ticker, a.otc)} ${a.otc ? '<span style="font-size:9px;color:var(--txt2)">OTC</span>' : ''}${catBadge}${hotBadge}${blockBadge}</span>
       <span class="pat-pct ${isMonster ? 'monster' : ''}">${pctStr}</span>
       <span class="pat-price">${priceChain}</span>
     </div>`;
