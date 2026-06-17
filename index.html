@@ -556,6 +556,14 @@ function sourceTag(src, slot) {
   if (src && src.includes('claude')) return '<span class="tag tag-claude">claude</span>';
   return '';
 }
+// LLM-agreement badge: which models scored this ticker BUY (G=Groq Q=Qwen R=deepseek-R1),
+// or MAN for a user-commanded manual buy.
+function llmBadge(b) {
+  if (!b) return '';
+  const title = b === 'MAN' ? 'Manual buy (your command)'
+              : 'LLMs that scored BUY — G=Groq, Q=Qwen, R=deepseek-R1';
+  return `<span class="tag" style="background:#243a5e;color:#9fc2ff;font-weight:600" title="${title}">${b}</span>`;
+}
 
 let weeklyChart = null;
 
@@ -892,7 +900,7 @@ function render(d) {
     for (const p of mainPos) {
       const uc = cls(p.unreal);
       h += `<tr>
-        <td>${gfLink(p.ticker)} ${sourceTag(p.source, p.slot_kind)}</td>
+        <td>${gfLink(p.ticker)} ${sourceTag(p.source, p.slot_kind)} ${llmBadge(p.llm_badge)}</td>
         <td>${p.qty}</td><td>$${p.avg}</td>
         <td class="hi">$${p.live}</td>
         <td class="${uc}">${fmt$(p.unreal)}</td>
@@ -944,9 +952,10 @@ function render(d) {
       const pc   = cls(totalPnl);
       const gid  = `cg-${ticker}`;
       const multi = trades.length > 1;
+      const lb = llmBadge(trades[0].llm_badge);
       const tickerCell = multi
-        ? `<span style="cursor:pointer" onclick="toggleGroup('${gid}')">${gfLink(ticker)} ${badge} <span id="${gid}-arrow" style="color:var(--txt2);font-size:10px">›</span></span>`
-        : `${gfLink(ticker)} ${badge}`;
+        ? `<span style="cursor:pointer" onclick="toggleGroup('${gid}')">${gfLink(ticker)} ${badge} ${lb} <span id="${gid}-arrow" style="color:var(--txt2);font-size:10px">›</span></span>`
+        : `${gfLink(ticker)} ${badge} ${lb}`;
       const reasons = [...new Set(trades.map(t=>t.reason).filter(Boolean))].join(', ');
       const oneTime = (trades.length===1 && (trades[0].buy_ts||trades[0].sell_ts))
         ? `<div style="font-size:9px;color:var(--txt2)">${ottawaTime(trades[0].buy_ts)}→${ottawaTime(trades[0].sell_ts)} ET</div>` : '';
