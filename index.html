@@ -378,6 +378,10 @@
       <div id="para-body"><div class="empty">No parabolic activity today</div></div>
     </section>
     <section>
+      <h2>Top Gainers — Massive <span class="badge" id="gainers-count">0</span></h2>
+      <div id="gainers-body"><div class="empty">Loading…</div></div>
+    </section>
+    <section>
       <h2>Duck Queue <span class="badge" id="duck-count">0</span></h2>
       <div id="duck-body"><div class="empty">Loading…</div></div>
     </section>
@@ -769,6 +773,7 @@ function render(d) {
   d.positions    = d.positions    || [];
   d.closed_today = d.closed_today || [];
   d.duck_queue   = d.duck_queue   || [];
+  d.massive_gainers = d.massive_gainers || [];
   d.history      = d.history      || [];
 
   // Market Sentiment
@@ -1088,6 +1093,23 @@ function render(d) {
         <td class="pos">+${q.pct}%</td><td>$${q.price}</td></tr>`;
     }
     dqb.innerHTML = h + '</tbody></table>';
+  }
+
+  // Top gainers (Massive)
+  const gainers = d.massive_gainers || [];
+  document.getElementById('gainers-count').textContent = gainers.length;
+  const gb = document.getElementById('gainers-body');
+  if (!gainers.length) {
+    gb.innerHTML = '<div class="empty">No gainers (feed stale or pre-market)</div>';
+  } else {
+    let h = '<table><thead><tr><th>Ticker</th><th>% Chg</th><th>Price</th><th>Volume</th></tr></thead><tbody>';
+    for (const g of gainers) {
+      const v = g.volume >= 1e6 ? (g.volume/1e6).toFixed(1)+'M' : (g.volume/1e3).toFixed(0)+'K';
+      h += `<tr><td>${gfLink(g.ticker)}</td>`
+        + `<td class="${g.pct_change>=0?'pos':'neg'}">${g.pct_change>=0?'+':''}${g.pct_change}%</td>`
+        + `<td>$${g.price}</td><td>${v}</td></tr>`;
+    }
+    gb.innerHTML = h + '</tbody></table>';
   }
 
   // Spotted today — skipped BUYs
