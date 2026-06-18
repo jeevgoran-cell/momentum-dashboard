@@ -260,6 +260,27 @@
   #regime-bar.bullish { background: #142a14; border-bottom-color: var(--green);  color: var(--green);  }
   #regime-bar .rb-reason { font-weight: 400; font-size: 11px; opacity: 0.85; }
   #regime-bar .rb-meta   { font-weight: 400; font-size: 10px; opacity: 0.6; margin-left: auto; }
+  /* 📰 flying news banner — strong sentiment + catalyst */
+  #news-banner { display: none; align-items: stretch; background: var(--bg2);
+    border-bottom: 1px solid var(--border); overflow: hidden; }
+  #news-banner.visible { display: flex; }
+  #news-banner .nb-label { flex: 0 0 auto; display: flex; align-items: center; gap: 5px;
+    padding: 6px 12px; background: var(--bg3); border-right: 1px solid var(--border);
+    font-size: 10px; font-weight: 700; letter-spacing: 0.06em; color: var(--yellow);
+    white-space: nowrap; }
+  #news-banner .nb-viewport { flex: 1 1 auto; overflow: hidden; position: relative; }
+  #news-banner .nb-track { display: inline-flex; white-space: nowrap; padding: 6px 0;
+    animation: nb-scroll 70s linear infinite; will-change: transform; }
+  #news-banner .nb-viewport:hover .nb-track { animation-play-state: paused; }
+  #news-banner .nb-item { display: inline-flex; align-items: center; gap: 7px;
+    margin: 0 26px; font-size: 12px; }
+  #news-banner .nb-tkr  { font-weight: 700; color: var(--blue); }
+  #news-banner .nb-pct  { font-weight: 600; color: var(--green); }
+  #news-banner .nb-head { color: var(--txt); }
+  #news-banner .nb-cat  { font-size: 9px; color: var(--yellow); border: 1px solid var(--yellow);
+    border-radius: 3px; padding: 0 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+  #news-banner .nb-sep  { color: var(--txt2); opacity: 0.5; }
+  @keyframes nb-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
   .fi-sent-bearish { border-left: 3px solid var(--red); }
   .fi-sent-neutral { border-left: 3px solid var(--yellow); }
   .fi-sent-bullish { border-left: 3px solid var(--green); }
@@ -307,6 +328,11 @@
   <span id="rb-label">—</span>
   <span class="rb-reason" id="rb-reason"></span>
   <span class="rb-meta"   id="rb-meta"></span>
+</div>
+
+<div id="news-banner">
+  <span class="nb-label">📰 STRONG CATALYST</span>
+  <div class="nb-viewport"><div class="nb-track" id="nb-track"></div></div>
 </div>
 
 <main>
@@ -765,9 +791,30 @@ function renderMvpSlot(d) {
     </div>`;
 }
 
+function renderNewsBanner(items) {
+  items = items || [];
+  const bar = document.getElementById('news-banner');
+  const track = document.getElementById('nb-track');
+  if (!bar || !track) return;
+  if (!items.length) { bar.classList.remove('visible'); return; }
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g,
+    c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const one = it => '<span class="nb-item">'
+    + `<span class="nb-tkr">$${esc(it.ticker)}</span>`
+    + (it.pct != null ? `<span class="nb-pct">${it.pct >= 0 ? '+' : ''}${esc(it.pct)}%</span>` : '')
+    + `<span class="nb-head">${esc(it.headline)}</span>`
+    + (it.catalyst ? `<span class="nb-cat">${esc(it.catalyst)}</span>` : '')
+    + '</span>';
+  // Duplicate the sequence so the -50% scroll loops seamlessly.
+  const seq = items.map(one).join('<span class="nb-sep">•</span>');
+  track.innerHTML = seq + '<span class="nb-sep">•</span>' + seq;
+  bar.classList.add('visible');
+}
+
 function render(d) {
   // Regime bar — top overall sentiment status
   renderRegimeBar(d);
+  renderNewsBanner(d.news_banner);
 
   // Null-guard all array fields so partial/stale Gist data can't crash the render
   d.positions    = d.positions    || [];
