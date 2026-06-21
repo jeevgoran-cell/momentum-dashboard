@@ -404,6 +404,10 @@
       <div id="para-body"><div class="empty">No parabolic activity today</div></div>
     </section>
     <section>
+      <h2>Questrade TFSA <span class="badge" id="qt-equity">—</span></h2>
+      <div id="qt-body"><div class="empty">Loading…</div></div>
+    </section>
+    <section>
       <h2>Top Gainers — Massive <span class="badge" id="gainers-count">0</span></h2>
       <div id="gainers-body"><div class="empty">Loading…</div></div>
     </section>
@@ -1143,6 +1147,29 @@ function render(d) {
   }
 
   // Top gainers (Massive)
+  // Questrade TFSA (read-only, real money)
+  const qt = d.questrade;
+  const qtEq = document.getElementById('qt-equity');
+  const qtb = document.getElementById('qt-body');
+  if (!qt) {
+    qtEq.textContent = '—';
+    qtb.innerHTML = '<div class="empty">Questrade not connected</div>';
+  } else {
+    qtEq.textContent = '$' + (qt.equity_usd || 0).toLocaleString() + ' USD';
+    let h = `<div style="font-size:12px;color:var(--txt2);margin-bottom:6px">`
+      + `CAD $${(qt.equity_cad||0).toLocaleString()} · cash $${(qt.cash_usd||0).toFixed(0)} · ${(qt.positions||[]).length} positions</div>`;
+    if ((qt.positions||[]).length) {
+      h += '<table><thead><tr><th>Symbol</th><th>Qty</th><th>Price</th><th>Mkt Val</th><th>Open P&L</th></tr></thead><tbody>';
+      for (const p of qt.positions) {
+        h += `<tr><td>${gfLink(p.symbol)}</td><td>${p.qty}</td><td>$${p.price}</td>`
+          + `<td>$${(p.mv||0).toLocaleString()}</td>`
+          + `<td class="${(p.pnl||0)>=0?'pos':'neg'}">${(p.pnl||0)>=0?'+':''}$${(p.pnl||0).toLocaleString()}</td></tr>`;
+      }
+      h += '</tbody></table>';
+    }
+    qtb.innerHTML = h;
+  }
+
   const gainers = d.massive_gainers || [];
   document.getElementById('gainers-count').textContent = gainers.length;
   const gb = document.getElementById('gainers-body');
