@@ -348,7 +348,7 @@
       <span onclick="toggleWeek()" style="cursor:pointer;font-size:20px;color:var(--txt2)">✕</span>
     </div>
     <div id="week-body"><div class="empty">Loading…</div></div>
-    <div style="font-size:11px;color:var(--txt2);margin-top:8px">Realized Mon→now, per pool.</div>
+    <div style="font-size:11px;color:var(--txt2);margin-top:8px">Realized Mon→now per pool + open-position Δ = Account week (matches header).</div>
   </div>
 </div>
 
@@ -599,19 +599,22 @@ function toggleWeek() {
   const m = document.getElementById('week-modal');
   if (m) m.style.display = (m.style.display === 'none' || !m.style.display) ? 'block' : 'none';
 }
-function renderWeekBreakdown(w) {
+function renderWeekBreakdown(w, accountWeek) {
   const b = document.getElementById('week-body');
   if (!b) return;
   if (!w) { b.innerHTML = '<div class="empty">No data</div>'; return; }
+  const money = (v) => `<td class="${v>=0?'pos':'neg'}" style="text-align:right">${v>=0?'+':''}$${Math.round(v).toLocaleString()}</td>`;
   const rows = [['Main','main'],['Duck','duck'],['Parabolic','para'],['Leverage','leverage'],['MVP','mvp']];
   let h = '<table><thead><tr><th>Pool</th><th style="text-align:right">Realized $</th></tr></thead><tbody>';
-  for (const [label,key] of rows) {
-    const v = w[key] || 0;
-    h += `<tr><td>${label}</td><td class="${v>=0?'pos':'neg'}" style="text-align:right">${v>=0?'+':''}$${v.toLocaleString()}</td></tr>`;
+  for (const [label,key] of rows) h += `<tr><td>${label}</td>${money(w[key]||0)}</tr>`;
+  const realized = w.total || 0;
+  h += `<tr style="border-top:1px solid var(--border)"><td>Realized</td>${money(realized)}</tr>`;
+  // Reconcile to the equity-based header Week P&L: account = realized + open-position Δ
+  if (accountWeek !== null && accountWeek !== undefined) {
+    const openDelta = accountWeek - realized;
+    h += `<tr><td style="color:var(--txt2)">Open Δ (unrealized)</td>${money(openDelta)}</tr>`;
+    h += `<tr style="border-top:1px solid var(--border);font-weight:700"><td>Account week</td>${money(accountWeek)}</tr>`;
   }
-  const t = w.total || 0;
-  h += `<tr style="border-top:1px solid var(--border);font-weight:700"><td>Total</td>`
-    + `<td class="${t>=0?'pos':'neg'}" style="text-align:right">${t>=0?'+':''}$${t.toLocaleString()}</td></tr>`;
   b.innerHTML = h + '</tbody></table>';
 }
 function sentColor(s) { return s === 'bullish' ? 'pos' : s === 'bearish' ? 'neg' : 'neu'; }
@@ -926,7 +929,7 @@ function render(d) {
   if (d.week_pnl !== null && d.week_pnl !== undefined) {
     wp.textContent = fmt$(d.week_pnl); wp.className = 'value ' + cls(d.week_pnl);
   }
-  renderWeekBreakdown(d.week_pnl_by_slot);
+  renderWeekBreakdown(d.week_pnl_by_slot, d.week_pnl);
   const rzv = d.realized_ex_para ?? d.realized_today ?? 0;
   const rz = document.getElementById('k-realized');
   rz.textContent = fmt$(rzv); rz.className = 'value ' + cls(rzv);
