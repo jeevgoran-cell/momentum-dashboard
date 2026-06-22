@@ -314,6 +314,11 @@
     <span class="label">Nasdaq (QQQ)</span>
     <span class="value" id="k-qqq">—</span>
   </div>
+  <div class="kpi" id="qt-btn" onclick="toggleQT()" title="Click to view Questrade TFSA positions"
+       style="border:1px solid #2d6cdf;border-radius:4px;padding:2px 8px;cursor:pointer;background:#0e1b33">
+    <span class="label">💼 Questrade</span>
+    <span class="value" id="qt-equity">—</span>
+  </div>
   <div id="status-bar">
     <span class="dot" id="dot"></span>
     <span id="data-age" style="font-weight:600"></span>
@@ -323,6 +328,16 @@
 </header>
 
 <div id="error-banner"></div>
+
+<div id="qt-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000" onclick="if(event.target.id==='qt-modal')toggleQT()">
+  <div style="max-width:760px;margin:6vh auto;background:var(--bg,#0d1117);border:1px solid #2d6cdf;border-radius:8px;padding:18px 20px;max-height:84vh;overflow:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <h2 style="margin:0">💼 Questrade TFSA</h2>
+      <span onclick="toggleQT()" style="cursor:pointer;font-size:20px;color:var(--txt2)">✕</span>
+    </div>
+    <div id="qt-body"><div class="empty">Loading…</div></div>
+  </div>
+</div>
 
 <div id="regime-bar">
   <span id="rb-label">—</span>
@@ -402,10 +417,6 @@
     <section>
       <h2>Parabolic Slot <span class="badge" id="para-day-pnl" style="font-size:12px"></span></h2>
       <div id="para-body"><div class="empty">No parabolic activity today</div></div>
-    </section>
-    <section>
-      <h2>Questrade TFSA <span class="badge" id="qt-equity">—</span></h2>
-      <div id="qt-body"><div class="empty">Loading…</div></div>
     </section>
     <section>
       <h2>Top Gainers — Massive <span class="badge" id="gainers-count">0</span></h2>
@@ -566,6 +577,10 @@ function toggleGroup(gid) {
   const open = row.style.display !== 'none';
   row.style.display = open ? 'none' : 'table-row';
   if (arrow) arrow.textContent = open ? '›' : '⌄';
+}
+function toggleQT() {
+  const m = document.getElementById('qt-modal');
+  if (m) m.style.display = (m.style.display === 'none' || !m.style.display) ? 'block' : 'none';
 }
 function sentColor(s) { return s === 'bullish' ? 'pos' : s === 'bearish' ? 'neg' : 'neu'; }
 function sentEmoji(s) { return s === 'bullish' ? '🟢' : s === 'bearish' ? '🔴' : '🟡'; }
