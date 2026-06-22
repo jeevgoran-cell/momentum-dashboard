@@ -295,7 +295,7 @@
   <div class="kpi"><span class="label">Day P&L (ex-para)</span><span class="value" id="k-daypnl">—</span></div>
   <div class="kpi"><span class="label">P&L so far</span><span class="value" id="k-sofar">—</span></div>
   <div class="kpi"><span class="label">Para P&L</span><span class="value" id="k-para">—</span></div>
-  <div class="kpi"><span class="label">Week P&L</span><span class="value"   id="k-weekpnl">—</span></div>
+  <div class="kpi" onclick="toggleWeek()" style="cursor:pointer" title="Click for per-pool breakdown"><span class="label">Week P&L ▾</span><span class="value"   id="k-weekpnl">—</span></div>
   <div class="kpi"><span class="label">Realized (ex-para)</span><span class="value" id="k-realized">—</span></div>
   <div class="kpi"><span class="label">Unrealized (ex-para)</span><span class="value" id="k-unreal">—</span></div>
   <div class="kpi"><span class="label">Cash</span><span class="value neu"   id="k-cash">—</span></div>
@@ -338,6 +338,17 @@
       <span onclick="toggleQT()" style="cursor:pointer;font-size:20px;color:var(--txt2)">✕</span>
     </div>
     <div id="qt-body"><div class="empty">Loading…</div></div>
+  </div>
+</div>
+
+<div id="week-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000" onclick="if(event.target.id==='week-modal')toggleWeek()">
+  <div style="max-width:480px;margin:8vh auto;background:var(--bg,#0d1117);border:1px solid #2d6cdf;border-radius:8px;padding:18px 20px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <h2 style="margin:0">📅 Week P&L by pool</h2>
+      <span onclick="toggleWeek()" style="cursor:pointer;font-size:20px;color:var(--txt2)">✕</span>
+    </div>
+    <div id="week-body"><div class="empty">Loading…</div></div>
+    <div style="font-size:11px;color:var(--txt2);margin-top:8px">Realized Mon→now, per pool.</div>
   </div>
 </div>
 
@@ -583,6 +594,25 @@ function toggleGroup(gid) {
 function toggleQT() {
   const m = document.getElementById('qt-modal');
   if (m) m.style.display = (m.style.display === 'none' || !m.style.display) ? 'block' : 'none';
+}
+function toggleWeek() {
+  const m = document.getElementById('week-modal');
+  if (m) m.style.display = (m.style.display === 'none' || !m.style.display) ? 'block' : 'none';
+}
+function renderWeekBreakdown(w) {
+  const b = document.getElementById('week-body');
+  if (!b) return;
+  if (!w) { b.innerHTML = '<div class="empty">No data</div>'; return; }
+  const rows = [['Main','main'],['Duck','duck'],['Parabolic','para'],['Leverage','leverage'],['MVP','mvp']];
+  let h = '<table><thead><tr><th>Pool</th><th style="text-align:right">Realized $</th></tr></thead><tbody>';
+  for (const [label,key] of rows) {
+    const v = w[key] || 0;
+    h += `<tr><td>${label}</td><td class="${v>=0?'pos':'neg'}" style="text-align:right">${v>=0?'+':''}$${v.toLocaleString()}</td></tr>`;
+  }
+  const t = w.total || 0;
+  h += `<tr style="border-top:1px solid var(--border);font-weight:700"><td>Total</td>`
+    + `<td class="${t>=0?'pos':'neg'}" style="text-align:right">${t>=0?'+':''}$${t.toLocaleString()}</td></tr>`;
+  b.innerHTML = h + '</tbody></table>';
 }
 function sentColor(s) { return s === 'bullish' ? 'pos' : s === 'bearish' ? 'neg' : 'neu'; }
 function sentEmoji(s) { return s === 'bullish' ? '🟢' : s === 'bearish' ? '🔴' : '🟡'; }
@@ -896,6 +926,7 @@ function render(d) {
   if (d.week_pnl !== null && d.week_pnl !== undefined) {
     wp.textContent = fmt$(d.week_pnl); wp.className = 'value ' + cls(d.week_pnl);
   }
+  renderWeekBreakdown(d.week_pnl_by_slot);
   const rzv = d.realized_ex_para ?? d.realized_today ?? 0;
   const rz = document.getElementById('k-realized');
   rz.textContent = fmt$(rzv); rz.className = 'value ' + cls(rzv);
@@ -1181,7 +1212,10 @@ function render(d) {
     qtEq.textContent = '—';
     qtb.innerHTML = '<div class="empty">Questrade not connected</div>';
   } else {
-    qtEq.textContent = '$' + (qt.equity_usd || 0).toLocaleString() + ' USD';
+    const op = qt.open_pnl || 0;
+    const arrow = op >= 0 ? '▲' : '▼';
+    qtEq.innerHTML = '$' + (qt.equity_usd || 0).toLocaleString()
+      + ` <span class="${op>=0?'pos':'neg'}">${arrow} $${Math.abs(op).toLocaleString()}</span>`;
     let h = `<div style="font-size:12px;color:var(--txt2);margin-bottom:6px">`
       + `CAD $${(qt.equity_cad||0).toLocaleString()} · cash $${(qt.cash_usd||0).toFixed(0)} · ${(qt.positions||[]).length} positions</div>`;
     if ((qt.positions||[]).length) {
