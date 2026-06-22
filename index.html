@@ -292,10 +292,12 @@
 <header>
   <h1>⚡ momentum_trader</h1>
   <div class="kpi"><span class="label">Equity</span><span class="value hi"  id="k-equity">—</span></div>
-  <div class="kpi"><span class="label">Day P&L</span><span class="value"    id="k-daypnl">—</span></div>
+  <div class="kpi"><span class="label">Day P&L (ex-para)</span><span class="value" id="k-daypnl">—</span></div>
+  <div class="kpi"><span class="label">P&L so far</span><span class="value" id="k-sofar">—</span></div>
+  <div class="kpi"><span class="label">Para P&L</span><span class="value" id="k-para">—</span></div>
   <div class="kpi"><span class="label">Week P&L</span><span class="value"   id="k-weekpnl">—</span></div>
-  <div class="kpi"><span class="label">Realized</span><span class="value"   id="k-realized">—</span></div>
-  <div class="kpi"><span class="label">Unrealized</span><span class="value" id="k-unreal">—</span></div>
+  <div class="kpi"><span class="label">Realized (ex-para)</span><span class="value" id="k-realized">—</span></div>
+  <div class="kpi"><span class="label">Unrealized (ex-para)</span><span class="value" id="k-unreal">—</span></div>
   <div class="kpi"><span class="label">Cash</span><span class="value neu"   id="k-cash">—</span></div>
   <div class="kpi"><span class="label">Positions</span><span class="value neu" id="k-pos">—</span></div>
   <div class="kpi"><span class="label">Closed W/L</span><span class="value" id="k-wl">—</span></div>
@@ -881,16 +883,25 @@ function render(d) {
 
   // KPIs
   document.getElementById('k-equity').textContent = fmtK(d.equity || 0);
+  const dpv = d.day_pnl_ex_para ?? d.day_pnl_acct ?? 0;
   const dp = document.getElementById('k-daypnl');
-  dp.textContent = fmt$(d.day_pnl_acct ?? 0); dp.className = 'value ' + cls(d.day_pnl_acct ?? 0);
+  dp.textContent = fmt$(dpv); dp.className = 'value ' + cls(dpv);
+  const sf = document.getElementById('k-sofar');
+  if (d.pnl_so_far !== null && d.pnl_so_far !== undefined) {
+    sf.textContent = fmt$(d.pnl_so_far); sf.className = 'value ' + cls(d.pnl_so_far);
+  }
+  const pa = document.getElementById('k-para');
+  pa.textContent = fmt$(d.para_day_pnl ?? 0); pa.className = 'value ' + cls(d.para_day_pnl ?? 0);
   const wp = document.getElementById('k-weekpnl');
   if (d.week_pnl !== null && d.week_pnl !== undefined) {
     wp.textContent = fmt$(d.week_pnl); wp.className = 'value ' + cls(d.week_pnl);
   }
+  const rzv = d.realized_ex_para ?? d.realized_today ?? 0;
   const rz = document.getElementById('k-realized');
-  rz.textContent = fmt$(d.realized_today ?? 0); rz.className = 'value ' + cls(d.realized_today ?? 0);
+  rz.textContent = fmt$(rzv); rz.className = 'value ' + cls(rzv);
+  const urv = d.unrealized_ex_para ?? d.unrealized ?? 0;
   const ur = document.getElementById('k-unreal');
-  ur.textContent = fmt$(d.unrealized ?? 0); ur.className = 'value ' + cls(d.unrealized ?? 0);
+  ur.textContent = fmt$(urv); ur.className = 'value ' + cls(urv);
   document.getElementById('k-cash').textContent = fmtK(d.cash ?? 0);
   document.getElementById('k-pos').textContent  = (d.open_count ?? '—') + ' / 12';
 
