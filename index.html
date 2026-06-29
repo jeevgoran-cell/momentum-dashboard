@@ -434,7 +434,7 @@
       <div id="pos-body"><div class="empty">Loading…</div></div>
     </section>
     <section>
-      <h2>Closed Today <span class="badge" id="closed-count">0</span></h2>
+      <h2>Closed Today <span class="badge" id="closed-count">0</span> <span class="badge" id="closed-pnl"></span></h2>
       <div id="closed-body"><div class="empty">Loading…</div></div>
     </section>
     <section>
@@ -1069,6 +1069,22 @@ function render(d) {
   // a ticker traded by both duck and para keeps its non-para portion).
   const mainClosed = (d.closed_today || []).filter(t => t.slot_kind !== 'para');
   document.getElementById('closed-count').textContent = mainClosed.length;
+  // Net P&L badge for the Closed Today header (net + W/L; gross profit/loss in tooltip)
+  const _cpnl = document.getElementById('closed-pnl');
+  if (_cpnl) {
+    const _cw = mainClosed.filter(t => (t.pnl || 0) > 0);
+    const _cl = mainClosed.filter(t => (t.pnl || 0) < 0);
+    const _net  = mainClosed.reduce((s, t) => s + (t.pnl || 0), 0);
+    const _gp   = _cw.reduce((s, t) => s + t.pnl, 0);
+    const _gl   = _cl.reduce((s, t) => s + t.pnl, 0);
+    if (mainClosed.length) {
+      _cpnl.textContent = `${fmt$(_net)} · ${_cw.length}W/${_cl.length}L`;
+      _cpnl.className = 'badge ' + cls(_net);
+      _cpnl.title = `Gross profit +$${Math.round(_gp).toLocaleString()} / Gross loss $${Math.round(_gl).toLocaleString()} (excl. parabolic)`;
+    } else {
+      _cpnl.textContent = '';
+    }
+  }
   const cb = document.getElementById('closed-body');
   if (!mainClosed.length) {
     cb.innerHTML = '<div class="empty">No closed trades today</div>';
