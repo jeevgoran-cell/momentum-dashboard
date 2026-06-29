@@ -292,9 +292,8 @@
 <header>
   <h1>⚡ momentum_trader</h1>
   <div class="kpi"><span class="label">Equity</span><span class="value hi"  id="k-equity">—</span></div>
-  <div class="kpi"><span class="label">Day P&L (ex-para)</span><span class="value" id="k-daypnl">—</span></div>
+  <div class="kpi" onclick="toggleDay()" style="cursor:pointer" title="Click for per-pool breakdown: long / short / leverage / para / gd"><span class="label">Day P&L ▾</span><span class="value" id="k-daypnl">—</span></div>
   <div class="kpi"><span class="label">P&L so far</span><span class="value" id="k-sofar">—</span></div>
-  <div class="kpi"><span class="label">Para P&L</span><span class="value" id="k-para">—</span></div>
   <div class="kpi" onclick="toggleWeek()" style="cursor:pointer" title="Click for per-pool breakdown"><span class="label">Week P&L ▾</span><span class="value"   id="k-weekpnl">—</span></div>
   <div class="kpi"><span class="label">Realized (ex-para)</span><span class="value" id="k-realized">—</span></div>
   <div class="kpi"><span class="label">Unrealized (ex-para)</span><span class="value" id="k-unreal">—</span></div>
@@ -349,6 +348,17 @@
     </div>
     <div id="week-body"><div class="empty">Loading…</div></div>
     <div style="font-size:11px;color:var(--txt2);margin-top:8px">Realized Mon→now per pool + open-position Δ = Account week (matches header).</div>
+  </div>
+</div>
+
+<div id="day-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000" onclick="if(event.target.id==='day-modal')toggleDay()">
+  <div style="max-width:480px;margin:8vh auto;background:var(--bg,#0d1117);border:1px solid #2d6cdf;border-radius:8px;padding:18px 20px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <h2 style="margin:0">📊 Day P&L by pool</h2>
+      <span onclick="toggleDay()" style="cursor:pointer;font-size:20px;color:var(--txt2)">✕</span>
+    </div>
+    <div id="day-body"><div class="empty">Loading…</div></div>
+    <div style="font-size:11px;color:var(--txt2);margin-top:8px">Today's realized + open unrealized per pool. Total = combined Day P&L. "Account day" is the equity-based figure (also includes fees / orphan flattens not attributed to a pool).</div>
   </div>
 </div>
 
@@ -614,6 +624,30 @@ function renderWeekBreakdown(w, accountWeek) {
     const openDelta = accountWeek - realized;
     h += `<tr><td style="color:var(--txt2)">Open Δ (unrealized)</td>${money(openDelta)}</tr>`;
     h += `<tr style="border-top:1px solid var(--border);font-weight:700"><td>Account week</td>${money(accountWeek)}</tr>`;
+  }
+  b.innerHTML = h + '</tbody></table>';
+}
+function toggleDay() {
+  const m = document.getElementById('day-modal');
+  if (m) m.style.display = (m.style.display === 'none' || !m.style.display) ? 'block' : 'none';
+}
+function renderDayBreakdown(s, accountDay) {
+  const b = document.getElementById('day-body');
+  if (!b) return;
+  if (!s) { b.innerHTML = '<div class="empty">No data</div>'; return; }
+  const money = (v) => `<td class="${v>=0?'pos':'neg'}" style="text-align:right">${v>=0?'+':''}$${Math.round(v).toLocaleString()}</td>`;
+  const rows = [['Long','long'],['Short','short'],['Leverage','leverage'],['Parabolic','para'],['Golden Ducks','gd']];
+  let h = '<table><thead><tr><th>Pool</th><th style="text-align:right">P&L $</th></tr></thead><tbody>';
+  for (const [label,key] of rows) h += `<tr><td>${label}</td>${money(s[key]||0)}</tr>`;
+  const total = s.total || 0;
+  h += `<tr style="border-top:1px solid var(--border);font-weight:700"><td>Total (Day P&L)</td>${money(total)}</tr>`;
+  // Reconcile to the equity-based account figure (includes fees / flattens)
+  if (accountDay !== null && accountDay !== undefined) {
+    const delta = accountDay - total;
+    if (Math.abs(delta) >= 1) {
+      h += `<tr><td style="color:var(--txt2)">Unattributed (fees / flatten)</td>${money(delta)}</tr>`;
+      h += `<tr style="border-top:1px solid var(--border)"><td style="color:var(--txt2)">Account day</td>${money(accountDay)}</tr>`;
+    }
   }
   b.innerHTML = h + '</tbody></table>';
 }
@@ -916,15 +950,14 @@ function render(d) {
 
   // KPIs
   document.getElementById('k-equity').textContent = fmtK(d.equity || 0);
-  const dpv = d.day_pnl_ex_para ?? d.day_pnl_acct ?? 0;
+  const dpv = d.day_pnl_by_slot?.total ?? d.day_pnl_acct ?? 0;
   const dp = document.getElementById('k-daypnl');
   dp.textContent = fmt$(dpv); dp.className = 'value ' + cls(dpv);
+  renderDayBreakdown(d.day_pnl_by_slot, d.day_pnl_acct);
   const sf = document.getElementById('k-sofar');
   if (d.pnl_so_far !== null && d.pnl_so_far !== undefined) {
     sf.textContent = fmt$(d.pnl_so_far); sf.className = 'value ' + cls(d.pnl_so_far);
   }
-  const pa = document.getElementById('k-para');
-  pa.textContent = fmt$(d.para_day_pnl ?? 0); pa.className = 'value ' + cls(d.para_day_pnl ?? 0);
   const wp = document.getElementById('k-weekpnl');
   if (d.week_pnl !== null && d.week_pnl !== undefined) {
     wp.textContent = fmt$(d.week_pnl); wp.className = 'value ' + cls(d.week_pnl);
