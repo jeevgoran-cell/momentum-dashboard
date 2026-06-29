@@ -347,7 +347,7 @@
       <span onclick="toggleWeek()" style="cursor:pointer;font-size:20px;color:var(--txt2)">✕</span>
     </div>
     <div id="week-body"><div class="empty">Loading…</div></div>
-    <div style="font-size:11px;color:var(--txt2);margin-top:8px">Realized Mon→now per pool + open-position Δ = Account week (matches header).</div>
+    <div style="font-size:11px;color:var(--txt2);margin-top:8px">Realized Mon→now per pool + Unattributed Δ (open unrealized + fees + un-logged account moves like orphan flattens) = Account week (matches header).</div>
   </div>
 </div>
 
@@ -619,10 +619,13 @@ function renderWeekBreakdown(w, accountWeek) {
   for (const [label,key] of rows) h += `<tr><td>${label}</td>${money(w[key]||0)}</tr>`;
   const realized = w.total || 0;
   h += `<tr style="border-top:1px solid var(--border)"><td>Realized</td>${money(realized)}</tr>`;
-  // Reconcile to the equity-based header Week P&L: account = realized + open-position Δ
+  // Reconcile to the equity-based header Week P&L. The gap = open-position
+  // unrealized Δ PLUS anything realized in the account but not in a pool log
+  // (fees, and one-offs like the 2026-06-29 orphan-leverage flatten done via
+  // direct Alpaca orders). Labeling it "unrealized" was wrong when unrealized=0.
   if (accountWeek !== null && accountWeek !== undefined) {
-    const openDelta = accountWeek - realized;
-    h += `<tr><td style="color:var(--txt2)">Open Δ (unrealized)</td>${money(openDelta)}</tr>`;
+    const gap = accountWeek - realized;
+    h += `<tr><td style="color:var(--txt2)">Unattributed Δ (unreal + fees/flatten)</td>${money(gap)}</tr>`;
     h += `<tr style="border-top:1px solid var(--border);font-weight:700"><td>Account week</td>${money(accountWeek)}</tr>`;
   }
   b.innerHTML = h + '</tbody></table>';
