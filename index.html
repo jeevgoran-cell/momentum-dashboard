@@ -430,7 +430,7 @@
     </section>
 
     <section>
-      <h2>Open Positions <span class="badge" id="pos-count">0</span></h2>
+      <h2>Open Positions <span class="badge" id="pos-count">0</span> <span class="badge" id="pos-pnl"></span></h2>
       <div id="pos-body"><div class="empty">Loading…</div></div>
     </section>
     <section>
@@ -1039,6 +1039,23 @@ function render(d) {
   // Open positions — parabolic slot shown in its own panel below, not here
   const mainPos = (d.positions || []).filter(p => p.slot_kind !== 'para');
   document.getElementById('pos-count').textContent = mainPos.length;
+  // Open-positions P&L summary: gross profit (green) / gross loss (red) = net (colored) · W/L
+  const _ppnl = document.getElementById('pos-pnl');
+  if (_ppnl) {
+    const _pw = mainPos.filter(p => (p.unreal || 0) > 0);
+    const _pl = mainPos.filter(p => (p.unreal || 0) < 0);
+    const _gp = _pw.reduce((s, p) => s + p.unreal, 0);
+    const _gl = _pl.reduce((s, p) => s + p.unreal, 0);
+    const _net = mainPos.reduce((s, p) => s + (p.unreal || 0), 0);
+    if (mainPos.length) {
+      _ppnl.innerHTML =
+        `<span class="pos">+$${Math.round(_gp).toLocaleString()}</span> / `
+        + `<span class="neg">$${Math.round(_gl).toLocaleString()}</span> = `
+        + `<span class="${cls(_net)}">${fmt$(_net)}</span> · ${_pw.length}W/${_pl.length}L`;
+    } else {
+      _ppnl.innerHTML = '';
+    }
+  }
   const pb = document.getElementById('pos-body');
   if (!mainPos.length) {
     pb.innerHTML = '<div class="empty">No open positions</div>';
@@ -1078,11 +1095,13 @@ function render(d) {
     const _gp   = _cw.reduce((s, t) => s + t.pnl, 0);
     const _gl   = _cl.reduce((s, t) => s + t.pnl, 0);
     if (mainClosed.length) {
-      _cpnl.textContent = `${fmt$(_net)} · ${_cw.length}W/${_cl.length}L`;
-      _cpnl.className = 'badge ' + cls(_net);
-      _cpnl.title = `Gross profit +$${Math.round(_gp).toLocaleString()} / Gross loss $${Math.round(_gl).toLocaleString()} (excl. parabolic)`;
+      _cpnl.innerHTML =
+        `<span class="pos">+$${Math.round(_gp).toLocaleString()}</span> / `
+        + `<span class="neg">$${Math.round(_gl).toLocaleString()}</span> = `
+        + `<span class="${cls(_net)}">${fmt$(_net)}</span> · ${_cw.length}W/${_cl.length}L`;
+      _cpnl.title = 'Gross profit / gross loss = net (excl. parabolic)';
     } else {
-      _cpnl.textContent = '';
+      _cpnl.innerHTML = '';
     }
   }
   const cb = document.getElementById('closed-body');
