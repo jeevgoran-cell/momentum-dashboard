@@ -651,6 +651,18 @@ function renderDayBreakdown(s, accountDay) {
   }
   b.innerHTML = h + '</tbody></table>';
 }
+// P&L summary badge: gross profit (green) / gross loss (red) = net (colored) · W/L.
+// vals = array of per-item P&L numbers (closed pnl + open/held unreal).
+function pnlSummaryHTML(vals) {
+  vals = (vals || []).filter(v => v !== null && v !== undefined);
+  const w = vals.filter(v => v > 0), l = vals.filter(v => v < 0);
+  const gp = w.reduce((s, v) => s + v, 0);
+  const gl = l.reduce((s, v) => s + v, 0);
+  const net = vals.reduce((s, v) => s + v, 0);
+  return `<span class="pos">+$${Math.round(gp).toLocaleString()}</span> / `
+    + `<span class="neg">$${Math.round(gl).toLocaleString()}</span> = `
+    + `<span class="${cls(net)}">${fmt$(net)}</span> · ${w.length}W/${l.length}L`;
+}
 function sentColor(s) { return s === 'bullish' ? 'pos' : s === 'bearish' ? 'neg' : 'neu'; }
 function sentEmoji(s) { return s === 'bullish' ? '🟢' : s === 'bearish' ? '🔴' : '🟡'; }
 function gfLink(ticker, otc) {
@@ -1186,9 +1198,11 @@ function render(d) {
   const para = d.parabolic_slot || {};
   const paraBody = document.getElementById('para-body');
   const paraDayPnl = document.getElementById('para-day-pnl');
-  if (paraDayPnl && para.day_pnl !== undefined) {
-    paraDayPnl.textContent = fmt$(para.day_pnl);
-    paraDayPnl.className = 'badge ' + cls(para.day_pnl);
+  if (paraDayPnl) {
+    const _pv = (para.closed || []).map(t => t.pnl);
+    if (para.held && para.held.unreal != null) _pv.push(para.held.unreal);
+    paraDayPnl.className = 'badge';
+    paraDayPnl.innerHTML = _pv.length ? pnlSummaryHTML(_pv) : '';
   }
   if (paraBody) {
     const held   = para.held || null;
@@ -1354,9 +1368,8 @@ function render(d) {
   const levClosed = lev.closed || [];
   if (levOpen.length || levClosed.length) {
     levSec.style.display = '';
-    const dp = lev.day_pnl || 0;
-    document.getElementById('lev-daypnl').innerHTML =
-      `<span class="${dp >= 0 ? 'pos' : 'neg'}">${dp >= 0 ? '+' : ''}$${dp.toFixed(2)} today</span>`;
+    const _lv = levOpen.map(p => p.unreal).concat(levClosed.map(t => t.pnl));
+    document.getElementById('lev-daypnl').innerHTML = pnlSummaryHTML(_lv);
     let lh = '';
     if (levOpen.length) {
       lh += '<div style="font-size:11px;color:var(--txt2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em">Open</div>';
