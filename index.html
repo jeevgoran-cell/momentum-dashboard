@@ -446,6 +446,10 @@
       <div id="gainers-body"><div class="empty">Loading…</div></div>
     </section>
     <section>
+      <h2>Duck Slot — Bought &amp; Sold <span class="badge" id="duck-slot-day-pnl" style="font-size:12px"></span></h2>
+      <div id="duck-slot-body"><div class="empty">No duck activity today</div></div>
+    </section>
+    <section>
       <h2>Duck Queue <span class="badge" id="duck-count">0</span></h2>
       <div id="duck-body"><div class="empty">Loading…</div></div>
     </section>
@@ -1274,6 +1278,91 @@ function render(d) {
         ph += `</tbody></table>`;
       }
       paraBody.innerHTML = ph;
+    }
+  }
+
+  // Duck slot (golden-duck bought & sold) — mirrors the parabolic panel, but
+  // duck.held is a LIST (the duck pool can hold more than one at once).
+  const duck = d.duck_slot || {};
+  const duckBody = document.getElementById('duck-slot-body');
+  const duckDayPnl = document.getElementById('duck-slot-day-pnl');
+  if (duckDayPnl) {
+    const _dv = (duck.closed || []).map(t => t.pnl);
+    for (const h of (duck.held || [])) { if (h.unreal != null) _dv.push(h.unreal); }
+    duckDayPnl.className = 'badge';
+    duckDayPnl.innerHTML = _dv.length ? pnlSummaryHTML(_dv) : '';
+  }
+  if (duckBody) {
+    const dHeld   = duck.held || [];
+    const dClosed = duck.closed || [];
+    if (dHeld.length === 0 && dClosed.length === 0) {
+      duckBody.innerHTML = '<div class="empty">No duck activity today</div>';
+    } else {
+      let dh = '';
+      if (dHeld.length > 0) {
+        dh += `<table><thead><tr><th>Held</th><th>Qty</th><th>Entry</th><th>Live</th><th>Unreal $</th><th>HWM</th><th>Bought</th><th>Held</th></tr></thead><tbody>`;
+        for (const h of dHeld) {
+          const uc = cls(h.unreal);
+          dh += `<tr>
+            <td>${gfLink(h.sym)} <span class="tag tag-duck">duck</span></td>
+            <td>${h.qty}</td><td>$${h.entry}</td>
+            <td>${h.live != null ? `<span class="hi">$${h.live}</span>` : '—'}</td>
+            <td class="${uc}">${h.unreal != null ? fmt$(h.unreal) : '—'}</td>
+            <td>$${h.hwm}</td>
+            <td style="font-size:10px;color:var(--txt2)">${ottawaTime(h.buy_ts)}</td>
+            <td>${holdStr(h.hold_min)}</td>
+          </tr>`;
+        }
+        dh += `</tbody></table>`;
+      }
+      if (dClosed.length > 0) {
+        // group same ticker, collapsible, with buy->sell timestamps
+        const dg = {};
+        for (const t of dClosed) { (dg[t.sym] = dg[t.sym] || []).push(t); }
+        const dOrder = Object.keys(dg).sort((a,b) =>
+          dg[b].reduce((s,t)=>s+t.pnl,0) - dg[a].reduce((s,t)=>s+t.pnl,0));
+        dh += `<table style="margin-top:8px"><thead><tr><th>Ticker</th><th>P&amp;L $</th><th>P&amp;L %</th><th>Trades</th><th>Time (ET)</th><th>Reason</th></tr></thead><tbody>`;
+        for (const sym of dOrder) {
+          const trades = dg[sym];
+          const totalPnl  = trades.reduce((s,t)=>s+t.pnl, 0);
+          const avgPnlPct = trades.reduce((s,t)=>s+(t.pnl_pct||0), 0) / trades.length;
+          const pc = cls(totalPnl);
+          const gid = `dcg-${sym}`;
+          const multi = trades.length > 1;
+          const catB = trades.some(t=>t.cat) ? ' <span class="tag tag-cat">⚡ CAT</span>' : '';
+          const tcell = multi
+            ? `<span style="cursor:pointer" onclick="toggleGroup('${gid}')">${gfLink(sym)} <span class="tag tag-duck">duck</span>${catB} <span id="${gid}-arrow" style="color:var(--txt2);font-size:10px">›</span></span>`
+            : `${gfLink(sym)} <span class="tag tag-duck">duck</span>${catB}`;
+          const t0 = trades[0];
+          const timeStr = multi ? `${trades.length}×` : `${ottawaTime(t0.buy_ts)}→${ottawaTime(t0.sell_ts)}`;
+          const reasons = [...new Set(trades.map(t=>t.reason).filter(Boolean))].join(', ');
+          dh += `<tr>
+            <td>${tcell}</td>
+            <td class="${pc}">${fmt$(totalPnl)}</td>
+            <td class="${pc}">${fmtPct(avgPnlPct)}</td>
+            <td style="color:var(--txt2)">${trades.length}</td>
+            <td style="font-size:10px;color:var(--txt2)">${timeStr}</td>
+            <td><span class="reason">${reasons||'—'}</span></td>
+          </tr>`;
+          if (multi) {
+            dh += `<tr id="${gid}" style="display:none"><td colspan="6" style="padding:0">
+              <table style="width:100%;background:var(--bg3);font-size:11px">
+              <thead><tr style="color:var(--txt2)"><th style="padding-left:20px">Entry</th><th>Exit</th><th>P&amp;L $</th><th>P&amp;L %</th><th>Bought→Sold (ET)</th><th>Reason</th></tr></thead><tbody>`;
+            for (const t of trades) {
+              const tpc = cls(t.pnl);
+              dh += `<tr>
+                <td style="padding-left:20px">$${t.entry}</td><td>$${t.exit}</td>
+                <td class="${tpc}">${fmt$(t.pnl)}</td><td class="${tpc}">${fmtPct(t.pnl_pct)}</td>
+                <td style="color:var(--txt2)">${ottawaTime(t.buy_ts)}→${ottawaTime(t.sell_ts)}</td>
+                <td><span class="reason">${t.reason||'—'}</span></td>
+              </tr>`;
+            }
+            dh += `</tbody></table></td></tr>`;
+          }
+        }
+        dh += `</tbody></table>`;
+      }
+      duckBody.innerHTML = dh;
     }
   }
 
