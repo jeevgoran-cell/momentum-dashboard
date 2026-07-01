@@ -786,7 +786,7 @@ function renderMvpHistory(hist) {
     : `<span class="${v >= 0 ? 'pos' : 'neg'}">${v >= 0 ? '+' : ''}${v.toFixed(1)}${suffix}</span>`;
   let totalPnl = 0, traded = 0, wins3d = 0, n3d = 0;
   let h = `<table><thead><tr>
-    <th>Date</th><th>Ticker</th><th>Day move</th><th>3d move</th>
+    <th>Date</th><th>Ticker</th><th>Price now</th><th>Day move</th><th>3d move</th>
     <th>Traded P&amp;L</th><th>Outcome</th></tr></thead><tbody>`;
   for (const r of hist) {
     if (r.traded && r.pnl_usd != null) { totalPnl += r.pnl_usd; traded++; }
@@ -794,9 +794,13 @@ function renderMvpHistory(hist) {
     const pnlCell = (r.traded && r.pnl_usd != null)
       ? `<span class="${r.pnl_usd >= 0 ? 'pos' : 'neg'}">${r.pnl_usd >= 0 ? '+' : ''}$${r.pnl_usd.toFixed(0)}</span>`
       : '<span class="neu">not traded</span>';
+    const liveCell = (r.live != null)
+      ? `<span class="hi">$${r.live.toFixed(2)}</span>`
+      : '<span class="neu">—</span>';
     h += `<tr>
       <td style="font-weight:400">${r.date.slice(5)}</td>
       <td>${gfLink(r.ticker)}</td>
+      <td>${liveCell}</td>
       <td>${cell(r.day_move_pct)}</td>
       <td>${cell(r.move_3d_pct)}</td>
       <td>${pnlCell}</td>
