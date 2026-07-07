@@ -320,6 +320,11 @@
     <span class="label">💼 Questrade</span>
     <span class="value" id="qt-equity">—</span>
   </div>
+  <div class="kpi" id="act-btn" onclick="toggleActivity()" title="Click to see live bot activity — running processes + last action per job"
+       style="border:1px solid #2d6cdf;border-radius:4px;padding:2px 8px;cursor:pointer;background:#0e1b33">
+    <span class="label">⚙️ Activity</span>
+    <span class="value" id="act-count">—</span>
+  </div>
   <div id="status-bar">
     <span class="dot" id="dot"></span>
     <span id="data-age" style="font-weight:600"></span>
@@ -337,6 +342,16 @@
       <span onclick="toggleQT()" style="cursor:pointer;font-size:20px;color:var(--txt2)">✕</span>
     </div>
     <div id="qt-body"><div class="empty">Loading…</div></div>
+  </div>
+</div>
+
+<div id="act-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000" onclick="if(event.target.id==='act-modal')toggleActivity()">
+  <div style="max-width:920px;margin:6vh auto;background:var(--bg,#0d1117);border:1px solid #2d6cdf;border-radius:8px;padding:18px 20px;max-height:84vh;overflow:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <h2 style="margin:0">⚙️ Bot Activity <span style="font-size:12px;color:var(--txt2);font-weight:400">(refreshes with payload, ~1min)</span></h2>
+      <span onclick="toggleActivity()" style="cursor:pointer;font-size:20px;color:var(--txt2)">✕</span>
+    </div>
+    <div id="act-body"><div class="empty">Loading…</div></div>
   </div>
 </div>
 
@@ -608,6 +623,36 @@ function toggleGroup(gid) {
 function toggleQT() {
   const m = document.getElementById('qt-modal');
   if (m) m.style.display = (m.style.display === 'none' || !m.style.display) ? 'block' : 'none';
+}
+function toggleActivity() {
+  const m = document.getElementById('act-modal');
+  if (m) m.style.display = (m.style.display === 'none' || !m.style.display) ? 'block' : 'none';
+}
+function renderBotActivity(a) {
+  a = a || {};
+  const procs = a.processes || [], logs = a.logs || [];
+  const cnt = document.getElementById('act-count');
+  if (cnt) cnt.textContent = procs.length ? procs.length + ' running' : '—';
+  const body = document.getElementById('act-body');
+  if (!body) return;
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g,
+    c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const age = s => s == null ? '?' : s < 90 ? s + 's' : s < 5400 ? Math.round(s / 60) + 'm'
+    : s < 172800 ? Math.round(s / 3600) + 'h' : Math.round(s / 86400) + 'd';
+  const pRows = procs.map(p =>
+    `<tr><td style="text-align:right;font-weight:${p.cpu >= 20 ? 700 : 400};color:${p.cpu >= 20 ? 'var(--red,#f85149)' : 'inherit'}">${(p.cpu || 0).toFixed(1)}%</td>` +
+    `<td style="text-align:right">${p.rss_mb || 0}MB</td><td>${esc(p.up)}</td><td>${esc(p.label)}</td></tr>`).join('');
+  const lRows = logs.map(r =>
+    `<tr><td style="text-align:right;color:${r.age_s != null && r.age_s < 120 ? 'var(--green,#3fb950)' : 'var(--txt2)'}">${age(r.age_s)}</td>` +
+    `<td style="white-space:nowrap">${esc(r.label)}</td>` +
+    `<td style="font-family:ui-monospace,monospace;font-size:11px;word-break:break-all">${esc(r.line)}</td></tr>`).join('');
+  body.innerHTML =
+    `<h3 style="margin:4px 0 6px">▶ Running now <span style="font-size:11px;color:var(--txt2);font-weight:400">(cpu-sorted — inference engines are the usual load)</span></h3>` +
+    `<table style="width:100%"><thead><tr><th style="text-align:right">CPU</th><th style="text-align:right">MEM</th><th>Uptime</th><th>Process</th></tr></thead>` +
+    `<tbody>${pRows || '<tr><td colspan="4" class="empty">nothing running this instant — cron jobs are between ticks</td></tr>'}</tbody></table>` +
+    `<h3 style="margin:16px 0 6px">▶ Last activity per job</h3>` +
+    `<table style="width:100%"><thead><tr><th style="text-align:right">Age</th><th>Job</th><th>Last log line</th></tr></thead><tbody>${lRows ||
+      '<tr><td colspan="3" class="empty">no data</td></tr>'}</tbody></table>`;
 }
 function toggleWeek() {
   const m = document.getElementById('week-modal');
@@ -926,6 +971,7 @@ function render(d) {
   // Regime bar — top overall sentiment status
   renderRegimeBar(d);
   renderNewsBanner(d.news_banner);
+  renderBotActivity(d.bot_activity);
 
   // Null-guard all array fields so partial/stale Gist data can't crash the render
   d.positions    = d.positions    || [];
